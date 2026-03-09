@@ -53,7 +53,7 @@
             <div class="col-6 col-md-3">
                 <div class="stat-item">
                     <div class="stat-number">99%</div>
-                    <div class="stat-label">Satisasdsadfaction</div>
+                    <div class="stat-label">Satisfaction</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
