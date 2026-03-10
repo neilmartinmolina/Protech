@@ -9,7 +9,16 @@ require 'phpmailer/PHPMailer.php';
 require 'phpmailer/SMTP.php';
 
 // ── Config ────────────────────────────────────────────────────────────────────
+require_once __DIR__ . '/config.php';
 
+// SMTP and mail-related configuration
+define('SMTP_HOST',   'smtp.gmail.com');
+define('SMTP_PORT',   587);
+define('SMTP_USER',   'neilmartinmolina@gmail.com');
+define('SMTP_PASS',   'yyio jctx phof utie');
+define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+define('SITE_URL',    'http://localhost/Protech/');
+define('FROM_NAME',   'Protech');
 
 // ── This MUST be the first output — any PHP notice/warning before here
 // ── will corrupt the response and cause "network error" on the frontend
@@ -120,6 +129,7 @@ $userLink = 'http://' . strtolower($u['firstName']) . '.com';
 function createMailer(): PHPMailer {
     $mail = new PHPMailer(true);
     $mail->isSMTP();
+    // Use values defined in config.php
     $mail->Host       = SMTP_HOST;
     $mail->SMTPAuth   = true;
     $mail->Username   = SMTP_USER;
@@ -163,7 +173,7 @@ try {
                     <tr style='border-bottom:1px solid #2a2a2a;'>
                         <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Link</td>
                         <td style='padding:10px 8px;font-weight:600;'>
-                            <a href='{$userLink}' style='color:#ff7315;'>'http://' . strtolower($u['firstName']) . '.com'</a>
+                            <a href='{$userLink}' style='color:#ff7315;'>{$userLink}</a>
                         </td>
                     </tr>
                     <tr>
