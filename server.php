@@ -8,8 +8,6 @@ require 'phpmailer/Exception.php';
 require 'phpmailer/PHPMailer.php';
 require 'phpmailer/SMTP.php';
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
 
 // ── This MUST be the first output — any PHP notice/warning before here
 // ── will corrupt the response and cause "network error" on the frontend
