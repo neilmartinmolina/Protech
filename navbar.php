@@ -20,8 +20,9 @@
                 </li>
             </ul>
             <div class="d-flex align-items-center gap-2">
-                <a href="admindash.php" class="nav-link" title="Admin"><i class="fa-regular fa-user fa-lg" style="color: var(--text-secondary);"></i></a>
-                <a href="signup.html" class="nav-cta">Get Started</a>
+                <a href="admindash.php" class="nav-link" title="Admin"><i class="fa-solid fa-user fa-lg" style="color: var(--text-secondary);"></i></a>
+                <a href="cart.php" class="nav-link" title="Cart"><i class="fa-solid fa-cart-shopping fa-lg" style="color: var(--text-secondary);"></i></a>
+                <a href="signup.php" class="nav-cta">Get Started</a>
             </div>
         </div>
     </div>

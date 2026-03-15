@@ -1,4 +1,12 @@
 <?php
+// ── Output header FIRST — nothing can print before this ──────────────────────
+header('Content-Type: application/json');
+
+// ── Suppress notices/warnings from leaking into JSON output ──────────────────
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+ini_set('log_errors', 1);
+
 session_start();
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -7,6 +15,7 @@ use PHPMailer\PHPMailer\Exception;
 require 'phpmailer/Exception.php';
 require 'phpmailer/PHPMailer.php';
 require 'phpmailer/SMTP.php';
+
 
 // ── Config ────────────────────────────────────────────────────────────────────
 require_once __DIR__ . '/config.php';
@@ -17,12 +26,10 @@ define('SMTP_PORT',   587);
 define('SMTP_USER',   'neilmartinmolina@gmail.com');
 define('SMTP_PASS',   'yyio jctx phof utie');
 define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
-define('SITE_URL',    'http://localhost/Protech/');
 define('FROM_NAME',   'Protech');
+define('DEV_NAME', 'NeilMartin');
+define('DEV_LINK', 'http://' . strtolower(DEV_NAME) . '.com');
 
-// ── This MUST be the first output — any PHP notice/warning before here
-// ── will corrupt the response and cause "network error" on the frontend
-header('Content-Type: application/json');
 
 // ── Only accept POST ──────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -65,6 +72,19 @@ if ($conn->connect_error) {
 
 $conn->set_charset('utf8mb4');
 
+// ── Ensure verification_tokens table exists ───────────────────────────────────
+$conn->query("
+    CREATE TABLE IF NOT EXISTS verification_tokens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token VARCHAR(64) NOT NULL UNIQUE,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_token (token),
+        INDEX idx_expires (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // ── Check for duplicate email or username ─────────────────────────────────────
 $stmt = $conn->prepare('SELECT email, username FROM users WHERE email = ? OR username = ? LIMIT 1');
 $stmt->bind_param('ss', $email, $username);
@@ -101,6 +121,16 @@ if (!$stmt->execute()) {
 
 $userId = $conn->insert_id;
 $stmt->close();
+
+// ── Create verification token (valid 1 hour) ───────────────────────────────────
+$verifyToken = bin2hex(random_bytes(32));
+$expiresAt   = date('Y-m-d H:i:s', time() + 3600);
+$stmtV = $conn->prepare('INSERT INTO verification_tokens (user_id, token, expires_at) VALUES (?, ?, ?)');
+$stmtV->bind_param('iss', $userId, $verifyToken, $expiresAt);
+$stmtV->execute();
+$stmtV->close();
+$verifyUrl = rtrim(SITE_URL, '/') . '/verify.php?token=' . urlencode($verifyToken);
+
 $conn->close();
 
 // ── Store in session ──────────────────────────────────────────────────────────
@@ -124,6 +154,7 @@ $signupTime   = date('F j, Y \a\t g:i A');
 // This is correct PHP — dot (.) is the concatenation operator, not +
 // strtolower so "John" becomes "http://john.com" not "http://John.com"
 $userLink = 'http://' . strtolower($u['firstName']) . '.com';
+$devLink  = DEV_LINK;
 
 // ── PHPMailer factory ─────────────────────────────────────────────────────────
 function createMailer(): PHPMailer {
@@ -145,39 +176,43 @@ try {
     // ── Email 1: Welcome to new user ──────────────────────────────────────────
     $mail = createMailer();
     $mail->addAddress($u['email'], "{$u['firstName']} {$u['lastName']}");
-    $mail->Subject = 'Welcome to Protech!';
+    $mail->Subject = 'Verify your Protech account';
     $mail->Body    = "
         <div style='font-family:sans-serif;max-width:520px;margin:auto;background:#141414;border-radius:12px;overflow:hidden;'>
             <div style='background:#ff7315;padding:24px;text-align:center;'>
-                <h1 style='color:white;margin:0;font-size:1.5rem;'>Email Received!</h1>
+                <h1 style='color:white;margin:0;font-size:1.5rem;'>Verify your email</h1>
             </div>
             <div style='padding:28px 24px;color:#e0e0e0;'>
-                <p style='font-size:1rem;'>Hi <strong>{$safeName}</strong>, your account has been created.</p>
+                <p style='font-size:1rem;'>Hi <strong>{$safeName}</strong>, please verify your email to activate your Protech account.</p>
+                <p style='margin:24px 0;text-align:center;'>
+                    <a href='{$verifyUrl}' style='display:inline-block;background:#ff7315;color:#fff!important;padding:14px 32px;border-radius:8px;font-weight:600;font-size:1rem;text-decoration:none;'>Verify Email</a>
+                </p>
+                <p style='color:#888;font-size:0.85rem;'>Or copy this link: <a href='{$verifyUrl}' style='color:#ff7315;word-break:break-all;'>{$verifyUrl}</a></p>
                 <table style='width:100%;border-collapse:collapse;margin:20px 0;'>
                     <tr style='border-bottom:1px solid #2a2a2a;'>
-                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>First Name</td>
+                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>First Name:</td>
                         <td style='padding:10px 8px;font-weight:600;'>{$u['firstName']}</td>
                     </tr>
                     <tr style='border-bottom:1px solid #2a2a2a;'>
-                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Last Name</td>
+                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Last Name:</td>
                         <td style='padding:10px 8px;font-weight:600;'>{$u['lastName']}</td>
                     </tr>
                     <tr style='border-bottom:1px solid #2a2a2a;'>
-                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Username</td>
+                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Username:</td>
                         <td style='padding:10px 8px;font-weight:600;'>{$safeUsername}</td>
                     </tr>
                     <tr style='border-bottom:1px solid #2a2a2a;'>
-                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Password</td>
+                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Password:</td>
                         <td style='padding:10px 8px;font-weight:600;'>{$password}</td>
                     </tr>
                     <tr style='border-bottom:1px solid #2a2a2a;'>
-                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Link</td>
+                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Link:</td>
                         <td style='padding:10px 8px;font-weight:600;'>
-                            <a href='{$userLink}' style='color:#ff7315;'>{$userLink}</a>
+                            <a href='{$devLink}' style='color:#ff7315;'>{$devLink}</a>
                         </td>
                     </tr>
                     <tr>
-                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Signed Up</td>
+                        <td style='padding:10px 8px;color:#888;font-size:0.85rem;'>Signed Up:</td>
                         <td style='padding:10px 8px;font-weight:600;'>{$signupTime}</td>
                     </tr>
                 </table>
@@ -233,7 +268,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Account created! Check your email for your account details.'
+        'message' => 'Account created! Check your email and click the Verify button to activate your account.'
     ]);
 
 } catch (Exception $e) {
