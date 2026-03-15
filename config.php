@@ -7,6 +7,12 @@ define('DB_PASS',     '');
 define('DB_NAME',     'protech');
 define('SITE_URL',    'http://localhost/Protech');
 define('DEV_NAME',    'NeilMartin');
+define('SMTP_HOST',   'smtp.gmail.com');
+define('SMTP_PORT',   587);
+define('SMTP_USER',   'neilmartinmolina@gmail.com');
+define('SMTP_PASS',   'yyio jctx phof utie');
+define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+define('FROM_NAME',   'Protech');
 
 // Also mirror these into $_ENV / getenv so they still behave like env vars
 $keys = [

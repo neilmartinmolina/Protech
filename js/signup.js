@@ -4,6 +4,10 @@
     const form          = document.getElementById('signupForm');
     const emailInput    = document.getElementById('email');
     const usernameInput = document.getElementById('username');
+    const roleInput     = document.getElementById('role');
+    const storeNameWrap = document.getElementById('storeNameWrap');
+    const storeNameInput = document.getElementById('storeName');
+    const avatarInput   = document.getElementById('avatar');
     const passwordInput = document.getElementById('password');
     const confirmInput  = document.getElementById('confirmPassword');
     const strengthBar   = document.getElementById('strengthBar');
@@ -23,6 +27,19 @@
 
     const isValidEmail    = v => /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(v.trim());
     const isValidUsername = v => /^[a-zA-Z0-9_]{3,50}$/.test(v.trim());
+    const isValidAvatar   = file => !file || (file.type.startsWith('image/') && file.size <= 2 * 1024 * 1024);
+    const toggleStoreName = () => {
+        const isSeller = roleInput.value === 'seller';
+        storeNameWrap.style.display = isSeller ? 'block' : 'none';
+        storeNameInput.required = isSeller;
+        if (!isSeller) {
+            clearState(storeNameInput);
+            storeNameInput.value = '';
+        }
+    };
+
+    roleInput.addEventListener('change', toggleStoreName);
+    toggleStoreName();
 
     emailInput.addEventListener('input', () => {
         const val   = emailInput.value.trim();
@@ -42,6 +59,12 @@
         const val = usernameInput.value.trim();
         if (!val) { clearState(usernameInput); return; }
         isValidUsername(val) ? setValid(usernameInput) : setInvalid(usernameInput);
+    });
+
+    avatarInput?.addEventListener('change', () => {
+        const file = avatarInput.files?.[0];
+        if (!file) { clearState(avatarInput); return; }
+        isValidAvatar(file) ? setValid(avatarInput) : setInvalid(avatarInput);
     });
 
     function getStrength(pw) {
@@ -111,6 +134,12 @@
         if (!lastName.value.trim())                { setInvalid(lastName);      valid = false; } else setValid(lastName);
         if (!isValidUsername(usernameInput.value)) { setInvalid(usernameInput); valid = false; } else setValid(usernameInput);
         if (!isValidEmail(emailInput.value))       { setInvalid(emailInput);    valid = false; } else setValid(emailInput);
+        if (!isValidAvatar(avatarInput.files?.[0])) { setInvalid(avatarInput); valid = false; } else if (avatarInput.files?.[0]) { setValid(avatarInput); }
+        if (roleInput.value === 'seller' && !storeNameInput.value.trim()) {
+            setInvalid(storeNameInput); valid = false;
+        } else if (roleInput.value === 'seller') {
+            setValid(storeNameInput);
+        }
         if (passwordInput.value.length < 6)        { setInvalid(passwordInput); valid = false; } else setValid(passwordInput);
         if (!confirmInput.value || confirmInput.value !== passwordInput.value) {
             setInvalid(confirmInput); valid = false;

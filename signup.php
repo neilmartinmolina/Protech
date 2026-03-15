@@ -24,7 +24,7 @@ $pageScripts = ['js/signup.js'];
         <div class="signup-card">
             <div id="serverMessage"></div>
 
-            <form id="signupForm" novalidate>
+            <form id="signupForm" novalidate enctype="multipart/form-data">
                 <div class="row">
                     <div class="col-6 mb-3">
                         <label class="form-label" for="firstName">First name</label>
@@ -52,6 +52,27 @@ $pageScripts = ['js/signup.js'];
                     <input type="text" class="form-control" id="email" name="email"
                            placeholder="john@example.com" required autocomplete="email">
                     <div class="invalid-feedback" id="emailError">Please enter a valid email.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="role">Register as</label>
+                    <select class="form-control" id="role" name="role" required>
+                        <option value="customer">Customer</option>
+                        <option value="seller">Seller</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="avatar">Profile photo</label>
+                    <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+                    <div class="invalid-feedback" id="avatarError">Please upload a valid image up to 2MB.</div>
+                </div>
+
+                <div class="mb-3" id="storeNameWrap" style="display: none;">
+                    <label class="form-label" for="storeName">Store name</label>
+                    <input type="text" class="form-control" id="storeName" name="storeName"
+                           placeholder="Your store name">
+                    <div class="invalid-feedback" id="storeNameError">Store name is required for sellers.</div>
                 </div>
 
                 <div class="mb-1">

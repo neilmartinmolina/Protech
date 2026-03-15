@@ -679,6 +679,118 @@ img {
 }
 
 /* ─── Utility ─── */
+body.modal-open {
+    overflow: hidden;
+}
+
+.action-btn,
+.ghost-btn {
+    border-radius: 12px;
+    padding: 0.8rem 1rem;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+}
+
+.action-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+}
+
+.action-btn:hover {
+    background: var(--primary-hover);
+    color: #fff;
+}
+
+.ghost-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.ghost-btn:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.app-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: none;
+}
+
+.app-modal.is-open {
+    display: block;
+}
+
+.app-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.68);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.app-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 520px);
+    margin: 10vh auto 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.app-modal__header,
+.app-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+}
+
+.app-modal__header {
+    border-bottom: 1px solid var(--border);
+}
+
+.app-modal__footer {
+    border-top: 1px solid var(--border);
+    justify-content: flex-end;
+}
+
+.app-modal__title {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.app-modal__close {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-light);
+    color: var(--text-secondary);
+}
+
+.app-modal__body {
+    padding: 1.25rem;
+}
+
+.app-modal__message {
+    margin: 0 0 1rem;
+    color: var(--text-secondary);
+}
+
+.app-modal__slot {
+    color: var(--text-secondary);
+}
+
 .text-gradient {
     background: linear-gradient(135deg, var(--primary), #ff9a56);
     -webkit-background-clip: text;

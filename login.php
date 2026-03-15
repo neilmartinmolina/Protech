@@ -36,7 +36,7 @@ $pageScripts = ['js/login.js'];
                 <div class="mb-1">
                     <div class="password-label-row">
                         <label class="form-label" for="password">Password</label>
-                        <a href="forgot-password.php" class="forgot-link">Forgot password?</a>
+                        <a href="forgotpassword.php" class="forgot-link">Forgot password?</a>
                     </div>
                     <div class="password-wrapper">
                         <input type="password" class="form-control" id="password" name="password"

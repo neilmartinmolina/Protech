@@ -1,13 +1,86 @@
+<?php
+require_once __DIR__ . '/app.php';
+
+$pageTitle = 'Products - ProTech';
+$conn = app_db();
+
+$products = [];
+$brands = [];
+$result = $conn->query("
+    SELECT id, name, brand, category, description, price, stock, icon_class
+    FROM products
+    WHERE is_active = 1
+    ORDER BY created_at DESC, id DESC
+");
+
+while ($row = $result->fetch_assoc()) {
+    $products[] = $row;
+    $brands[$row['brand']] = true;
+}
+
+$brandList = array_keys($brands);
+sort($brandList, SORT_NATURAL | SORT_FLAG_CASE);
+
+$priceRanges = [
+    ['label' => 'Under $100', 'min' => 0, 'max' => 99.99, 'key' => 'under-100'],
+    ['label' => '$100 - $500', 'min' => 100, 'max' => 500, 'key' => '100-500'],
+    ['label' => '$500 - $1,000', 'min' => 500, 'max' => 1000, 'key' => '500-1000'],
+    ['label' => 'Above $1,000', 'min' => 1000.01, 'max' => 1000000, 'key' => 'above-1000'],
+];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include "header.php" ?>
+    <?php include __DIR__ . '/header.php'; ?>
+    <style>
+        .product-layout { display: grid; grid-template-columns: 260px 1fr; gap: 1.5rem; align-items: start; }
+        .filter-sidebar {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 16px;
+            padding: 1.25rem;
+            position: sticky;
+            top: 100px;
+        }
+        .filter-sidebar h5 {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 0.85rem;
+        }
+        .filter-group { margin-bottom: 1.25rem; }
+        .filter-check { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.65rem; color: var(--text-secondary); }
+        .filter-check input { accent-color: var(--primary); }
+        .product-topbar {
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+        }
+        .search-input-wide {
+            flex: 1;
+            min-width: 220px;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 12px;
+            color: var(--text-primary);
+            padding: 0.85rem 1rem;
+        }
+        .search-input-wide:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(255,115,21,.1); }
+        .result-count { color: var(--text-muted); font-size: 0.85rem; }
+        .stock-note { color: var(--text-muted); font-size: 0.8rem; }
+        .product-item .product-card { min-height: 100%; }
+        .product-card .card-body { padding-bottom: 1rem; }
+        @media (max-width: 991.98px) {
+            .product-layout { grid-template-columns: 1fr; }
+            .filter-sidebar { position: static; }
+        }
+    </style>
 </head>
 <body>
+<?php include __DIR__ . '/navbar.php'; ?>
 
-<?php include "navbar.php" ?>
-
-<!-- Page Header -->
 <div class="product-listing-header">
     <div class="container">
         <div class="section-label"><i class="fa-solid fa-box-open"></i> Our Catalog</div>
@@ -16,240 +89,125 @@
     </div>
 </div>
 
-<!-- Filter + Products -->
 <section class="products-section pb-5">
     <div class="container">
+        <div class="product-layout">
+            <aside class="filter-sidebar">
+                <div class="filter-group">
+                    <h5>Product Brand</h5>
+                    <?php foreach ($brandList as $brand): ?>
+                        <label class="filter-check">
+                            <input type="checkbox" class="brand-filter" value="<?= app_sanitize($brand) ?>">
+                            <span><?= app_sanitize($brand) ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <div class="filter-group">
+                    <h5>Product Pricing</h5>
+                    <?php foreach ($priceRanges as $range): ?>
+                        <label class="filter-check">
+                            <input type="checkbox" class="price-filter" data-min="<?= $range['min'] ?>" data-max="<?= $range['max'] ?>" value="<?= app_sanitize($range['key']) ?>">
+                            <span><?= app_sanitize($range['label']) ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </aside>
 
-        <!-- Filter Bar -->
-        <div class="product-filter-bar">
-            <div style="position: relative; flex: 1; min-width: 200px;">
-                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.85rem;"></i>
-                <input type="text" class="search-input" id="productSearch" placeholder="Search products...">
-            </div>
-            <button class="filter-btn active" data-filter="all">All</button>
-            <button class="filter-btn" data-filter="laptops">Laptops</button>
-            <button class="filter-btn" data-filter="desktops">Desktops</button>
-            <button class="filter-btn" data-filter="peripherals">Peripherals</button>
-            <button class="filter-btn" data-filter="networking">Networking</button>
-        </div>
+            <div>
+                <div class="product-topbar">
+                    <input type="text" class="search-input-wide" id="productSearch" placeholder="Search products by name, brand, or category">
+                    <div class="result-count"><span id="productCount"><?= count($products) ?></span> products</div>
+                </div>
 
-        <!-- Product Grid -->
-        <div class="row g-4" id="productGrid">
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="laptops">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-laptop"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Laptops</div>
-                        <h5 class="card-title">ProBook X1 Ultra</h5>
-                        <p class="card-text">15.6" 4K OLED, Intel i9, 32GB RAM, 1TB SSD. Built for professionals who demand the best.</p>
-                        <div class="card-price">$1,499.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
+                <div class="row g-4" id="productGrid">
+                    <?php foreach ($products as $product): ?>
+                        <div
+                            class="col-md-6 col-xl-4 product-item"
+                            data-product-id="<?= (int) $product['id'] ?>"
+                            data-brand="<?= app_sanitize(strtolower($product['brand'])) ?>"
+                            data-price="<?= (float) $product['price'] ?>"
+                            data-search="<?= app_sanitize(strtolower($product['name'] . ' ' . $product['brand'] . ' ' . $product['category'])) ?>"
+                        >
+                            <div class="product-card h-100">
+                                <div class="card-img-top"><i class="<?= app_sanitize($product['icon_class']) ?>"></i></div>
+                                <div class="card-body">
+                                    <div class="card-category">#<?= (int) $product['id'] ?> • <?= app_sanitize($product['brand']) ?></div>
+                                    <h5 class="card-title"><?= app_sanitize($product['name']) ?></h5>
+                                    <p class="card-text"><?= app_sanitize($product['description']) ?></p>
+                                    <div class="card-price">$<?= number_format((float) $product['price'], 2) ?></div>
+                                    <div class="stock-note"><?= (int) $product['stock'] ?> in stock</div>
+                                </div>
+                                <div class="card-footer-custom">
+                                    <button class="btn-card btn-card-primary add-to-cart-btn" data-product-id="<?= (int) $product['id'] ?>">Add to Cart</button>
+                                    <button class="btn-card btn-card-outline" type="button">ID <?= (int) $product['id'] ?></button>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="desktops">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-desktop"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Desktops</div>
-                        <h5 class="card-title">TowerMax Pro 5000</h5>
-                        <p class="card-text">AMD Ryzen 9, RTX 4080, 64GB RAM, liquid cooled. Ultimate power for creators and gamers.</p>
-                        <div class="card-price">$2,299.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="peripherals">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-keyboard"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Peripherals</div>
-                        <h5 class="card-title">MechStrike RGB Keyboard</h5>
-                        <p class="card-text">Hot-swappable mechanical switches, per-key RGB, aircraft-grade aluminum frame.</p>
-                        <div class="card-price">$149.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="networking">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-wifi"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Networking</div>
-                        <h5 class="card-title">NetPro Wi-Fi 7 Router</h5>
-                        <p class="card-text">Tri-band Wi-Fi 7, 10Gbps Ethernet, mesh-ready. Blanket your space in high-speed connectivity.</p>
-                        <div class="card-price">$349.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="laptops">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-laptop"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Laptops</div>
-                        <h5 class="card-title">SlimBook Air 14</h5>
-                        <p class="card-text">Ultra-thin 14" FHD, Intel i5, 16GB RAM, 512GB SSD. All-day battery for work on the go.</p>
-                        <div class="card-price">$899.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="peripherals">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-computer-mouse"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Peripherals</div>
-                        <h5 class="card-title">PrecisionGlide Mouse</h5>
-                        <p class="card-text">25K DPI sensor, wireless, 80-hour battery, ergonomic contour design for long sessions.</p>
-                        <div class="card-price">$79.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="desktops">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-server"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Desktops</div>
-                        <h5 class="card-title">CompactDesk Mini</h5>
-                        <p class="card-text">Intel i7, 32GB RAM, 1TB NVMe. Powerful desktop in a tiny form factor for tight workspaces.</p>
-                        <div class="card-price">$1,099.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-lg-4 col-xl-3 product-item" data-category="networking">
-                <div class="product-card">
-                    <div class="card-img-top"><i class="fa-solid fa-ethernet"></i></div>
-                    <div class="card-body">
-                        <div class="card-category">Networking</div>
-                        <h5 class="card-title">SwitchPro 24-Port</h5>
-                        <p class="card-text">Managed Gigabit switch with PoE+, VLAN support, and a silent fanless design for offices.</p>
-                        <div class="card-price">$249.00</div>
-                    </div>
-                    <div class="card-footer-custom">
-                        <button class="btn-card btn-card-primary">Add to Cart</button>
-                        <button class="btn-card btn-card-outline">Details</button>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
 </section>
 
-<!-- Footer -->
-<footer class="site-footer">
-    <div class="container">
-        <div class="row g-4">
-            <div class="col-lg-4">
-                <div class="footer-brand"><i class="fa-solid fa-microchip"></i> Pro<span>Tech</span></div>
-                <p class="footer-desc">Tech that transforms, service that delivers. Your trusted partner for technology solutions.</p>
-            </div>
-            <div class="col-6 col-lg-2">
-                <h6>Company</h6>
-                <ul class="footer-links">
-                    <li><a href="index.php#about">About Us</a></li>
-                    <li><a href="#">Careers</a></li>
-                    <li><a href="#">Contact</a></li>
-                </ul>
-            </div>
-            <div class="col-6 col-lg-2">
-                <h6>Products</h6>
-                <ul class="footer-links">
-                    <li><a href="product.php">All Products</a></li>
-                    <li><a href="#">New Arrivals</a></li>
-                    <li><a href="#">Best Sellers</a></li>
-                </ul>
-            </div>
-            <div class="col-6 col-lg-2">
-                <h6>Support</h6>
-                <ul class="footer-links">
-                    <li><a href="#">Help Center</a></li>
-                    <li><a href="#">Warranty</a></li>
-                    <li><a href="#">Returns</a></li>
-                </ul>
-            </div>
-            <div class="col-6 col-lg-2">
-                <h6>Legal</h6>
-                <ul class="footer-links">
-                    <li><a href="#">Privacy Policy</a></li>
-                    <li><a href="#">Terms of Service</a></li>
-                    <li><a href="#">Cookie Policy</a></li>
-                </ul>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; 2026 ProTech. All rights reserved.</p>
-            <div class="social-links">
-                <a href="#"><i class="fa-brands fa-facebook-f"></i></a>
-                <a href="#"><i class="fa-brands fa-twitter"></i></a>
-                <a href="#"><i class="fa-brands fa-instagram"></i></a>
-                <a href="#"><i class="fa-brands fa-linkedin-in"></i></a>
-            </div>
-        </div>
-    </div>
-</footer>
-
+<?php include __DIR__ . '/footer.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (() => {
     const searchInput = document.getElementById('productSearch');
-    const filterBtns = document.querySelectorAll('.filter-btn');
-    const items = document.querySelectorAll('.product-item');
-    let activeFilter = 'all';
+    const brandFilters = [...document.querySelectorAll('.brand-filter')];
+    const priceFilters = [...document.querySelectorAll('.price-filter')];
+    const items = [...document.querySelectorAll('.product-item')];
+    const countEl = document.getElementById('productCount');
 
-    function applyFilters() {
-        const query = searchInput.value.toLowerCase().trim();
+    function filterProducts() {
+        const query = searchInput.value.trim().toLowerCase();
+        const activeBrands = brandFilters.filter(input => input.checked).map(input => input.value.toLowerCase());
+        const activePrices = priceFilters.filter(input => input.checked).map(input => ({
+            min: Number(input.dataset.min),
+            max: Number(input.dataset.max)
+        }));
+
+        let visibleCount = 0;
+
         items.forEach(item => {
-            const cat = item.dataset.category;
-            const text = item.textContent.toLowerCase();
-            const matchFilter = activeFilter === 'all' || cat === activeFilter;
-            const matchSearch = !query || text.includes(query);
-            item.style.display = matchFilter && matchSearch ? '' : 'none';
+            const brand = item.dataset.brand;
+            const price = Number(item.dataset.price);
+            const search = item.dataset.search;
+            const matchesSearch = !query || search.includes(query);
+            const matchesBrand = activeBrands.length === 0 || activeBrands.includes(brand);
+            const matchesPrice = activePrices.length === 0 || activePrices.some(range => price >= range.min && price <= range.max);
+            const visible = matchesSearch && matchesBrand && matchesPrice;
+            item.style.display = visible ? '' : 'none';
+            if (visible) visibleCount += 1;
         });
+
+        countEl.textContent = visibleCount;
     }
 
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            activeFilter = btn.dataset.filter;
-            applyFilters();
-        });
-    });
+    async function updateCart(productId) {
+        const payload = new FormData();
+        payload.append('action', 'add');
+        payload.append('product_id', productId);
+        payload.append('quantity', '1');
 
-    searchInput.addEventListener('input', applyFilters);
+        const res = await fetch('cart_action.php', { method: 'POST', body: payload });
+        const data = await res.json();
+
+        if (!data.success) {
+            alert(data.message || 'Unable to add item to cart.');
+            return;
+        }
+
+        window.location.href = 'cart.php';
+    }
+
+    searchInput.addEventListener('input', filterProducts);
+    brandFilters.forEach(input => input.addEventListener('change', filterProducts));
+    priceFilters.forEach(input => input.addEventListener('change', filterProducts));
+    document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+        button.addEventListener('click', () => updateCart(button.dataset.productId));
+    });
 })();
 </script>
 </body>
