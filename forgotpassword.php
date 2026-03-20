@@ -8,7 +8,7 @@ $pageScripts = ['js/forgot_password.js'];
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/header.php'; ?>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
     <div class="fp-wrapper">
@@ -49,6 +49,6 @@ $pageScripts = ['js/forgot_password.js'];
 
     </div>
 
-<?php include __DIR__ . '/scripts.php'; ?>
+<?php include __DIR__ . '/includes/scripts.php'; ?>
 </body>
 </html>

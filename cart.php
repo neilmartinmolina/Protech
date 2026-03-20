@@ -2,7 +2,8 @@
 require_once __DIR__ . '/app.php';
 
 $pageTitle = 'Cart - ProTech';
-$flash = null;
+$pageCss  = ['cart.css'];
+$flash    = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'checkout') {
     $user = app_require_login();
@@ -21,50 +22,10 @@ $subtotal = app_cart_total();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/header.php'; ?>
-    <style>
-        .cart-shell { padding: 7rem 0 4rem; min-height: 100vh; }
-        .cart-card, .cart-summary {
-            background: #111;
-            border: 1px solid #222;
-            border-radius: 18px;
-            padding: 1.25rem;
-        }
-        .cart-item + .cart-item { border-top: 1px solid #222; margin-top: 1rem; padding-top: 1rem; }
-        .qty-input {
-            width: 84px;
-            background: #0d0d0d;
-            border: 1px solid #222;
-            border-radius: 10px;
-            color: var(--text-primary);
-            padding: 0.55rem 0.65rem;
-        }
-        .action-btn {
-            border: 1px solid #333;
-            background: transparent;
-            color: var(--text-secondary);
-            border-radius: 10px;
-            padding: 0.55rem 0.85rem;
-        }
-        .action-btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
-        .empty-cart {
-            text-align: center;
-            padding: 4rem 1.5rem;
-            background: #111;
-            border: 1px dashed #333;
-            border-radius: 18px;
-        }
-        .flash {
-            border-radius: 14px;
-            padding: 0.95rem 1rem;
-            margin-bottom: 1rem;
-        }
-        .flash.success { background: rgba(16,185,129,.12); color: #7cf2bf; }
-        .flash.danger { background: rgba(239,68,68,.12); color: #ffaaaa; }
-    </style>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
-<?php include __DIR__ . '/navbar.php'; ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <section class="cart-shell">
     <div class="container">
@@ -132,7 +93,7 @@ $subtotal = app_cart_total();
     </div>
 </section>
 
-<?php include __DIR__ . '/footer.php'; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>
 <script>
 (() => {
     async function cartAction(action, productId, quantity = 1) {

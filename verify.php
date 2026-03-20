@@ -52,7 +52,7 @@ $pageCss   = ['verify.css'];
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/header.php'; ?>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
     <div class="verify-card">
@@ -80,6 +80,6 @@ $pageCss   = ['verify.css'];
             <a href="index.php"><i class="fa-solid fa-arrow-left"></i> Back to Home</a>
         </div>
     </div>
-<?php include __DIR__ . '/scripts.php'; ?>
+<?php include __DIR__ . '/includes/scripts.php'; ?>
 </body>
 </html>

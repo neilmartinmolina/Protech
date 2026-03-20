@@ -2,6 +2,7 @@
 require_once __DIR__ . '/app.php';
 
 $pageTitle = 'Products - ProTech';
+$pageCss  = ['product.css'];
 $conn = app_db();
 
 $products = [];
@@ -35,55 +36,10 @@ $priceRanges = [
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/header.php'; ?>
-    <style>
-        .product-layout { display: grid; grid-template-columns: 260px 1fr; gap: 1.5rem; align-items: start; }
-        .filter-sidebar {
-            background: #111;
-            border: 1px solid #222;
-            border-radius: 16px;
-            padding: 1.25rem;
-            position: sticky;
-            top: 100px;
-        }
-        .filter-sidebar h5 {
-            color: var(--text-primary);
-            font-size: 0.95rem;
-            margin-bottom: 0.85rem;
-        }
-        .filter-group { margin-bottom: 1.25rem; }
-        .filter-check { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.65rem; color: var(--text-secondary); }
-        .filter-check input { accent-color: var(--primary); }
-        .product-topbar {
-            display: flex;
-            gap: 1rem;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.25rem;
-            flex-wrap: wrap;
-        }
-        .search-input-wide {
-            flex: 1;
-            min-width: 220px;
-            background: #111;
-            border: 1px solid #222;
-            border-radius: 12px;
-            color: var(--text-primary);
-            padding: 0.85rem 1rem;
-        }
-        .search-input-wide:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(255,115,21,.1); }
-        .result-count { color: var(--text-muted); font-size: 0.85rem; }
-        .stock-note { color: var(--text-muted); font-size: 0.8rem; }
-        .product-item .product-card { min-height: 100%; }
-        .product-card .card-body { padding-bottom: 1rem; }
-        @media (max-width: 991.98px) {
-            .product-layout { grid-template-columns: 1fr; }
-            .filter-sidebar { position: static; }
-        }
-    </style>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
-<?php include __DIR__ . '/navbar.php'; ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <div class="product-listing-header">
     <div class="container">
@@ -154,7 +110,7 @@ $priceRanges = [
     </div>
 </section>
 
-<?php include __DIR__ . '/footer.php'; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (() => {

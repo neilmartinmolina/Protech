@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/app.php';
+require_once dirname(__DIR__) . '/app.php';
 
 $navUser = app_current_user();
 $cartCount = app_cart_count();

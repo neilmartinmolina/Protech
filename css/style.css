@@ -156,7 +156,7 @@ img {
     padding: 120px 20px 80px;
     background-image:
         linear-gradient(160deg, rgba(10, 10, 10, 0.92), rgba(10, 10, 10, 0.7)),
-        url("media/bg/background.avif");
+        url("../media/bg/background.avif");
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;

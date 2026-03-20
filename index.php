@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include "header.php" ?>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
 
-<?php include "navbar.php" ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <!-- Hero -->
 <section class="hero-section">
@@ -124,7 +124,7 @@
 </section>
 
 <!-- Footer -->
-<?php include "footer.php" ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

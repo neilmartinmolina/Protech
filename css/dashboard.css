@@ -1,0 +1,134 @@
+/* Dashboard-specific styles (admin/seller panels) */
+.panel-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+}
+.panel-card h4 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+.pill {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.pill.pending {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--warning);
+}
+.pill.placed,
+.pill.processing {
+    background: rgba(59, 130, 246, 0.12);
+    color: #8ec5ff;
+}
+.pill.completed,
+.pill.approved {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+}
+.pill.cancelled,
+.pill.rejected {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ff9e9e;
+}
+.flash {
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+}
+.flash.success {
+    background: rgba(16, 185, 129, 0.12);
+    color: #7cf2bf;
+}
+.flash.warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: #ffd479;
+}
+.flash.danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ff9e9e;
+}
+.approve-btn,
+.reject-btn,
+.edit-btn,
+.status-btn,
+.add-product-btn {
+    border-radius: 10px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+.approve-btn,
+.edit-btn,
+.add-product-btn,
+.status-btn {
+    background: var(--primary);
+    color: #fff;
+}
+.reject-btn {
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    color: #ff9e9e;
+}
+.action-stack {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.reason-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+.chart-card {
+    min-height: 360px;
+}
+.chart-wrap {
+    position: relative;
+    height: 280px;
+}
+.modal-form-grid {
+    display: grid;
+    gap: 0.9rem;
+}
+.modal-form-grid.two-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.modal-form-grid .full {
+    grid-column: 1 / -1;
+}
+.modal-form-grid label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+    display: block;
+}
+.modal-form-grid input,
+.modal-form-grid select,
+.modal-form-grid textarea {
+    width: 100%;
+    background: var(--surface-light);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 0.75rem 0.85rem;
+}
+.modal-form-grid textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+@media (max-width: 767.98px) {
+    .modal-form-grid.two-col {
+        grid-template-columns: 1fr;
+    }
+}

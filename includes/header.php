@@ -9,15 +9,22 @@
 $basePath = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/\\');
 $basePath = ($basePath === '' || $basePath === '/' || $basePath === '\\') ? '' : $basePath;
 $basePath = $basePath ?: '';
+$cssDir = 'css';
+$baseCss = $basePath ? $basePath . '/' . $cssDir : $cssDir;
 ?>
-<link rel="stylesheet" href="<?= htmlspecialchars($basePath ? $basePath . '/' : ''); ?>style.css">
+<link rel="stylesheet" href="<?= htmlspecialchars($baseCss); ?>/style.css">
 <?php
 if (!empty($pageCss) && is_array($pageCss)) {
     foreach ($pageCss as $href) {
-        $url = $basePath . '/' . ltrim($href, '/');
+        $href = strpos($href, 'css/') === 0 ? $href : $cssDir . '/' . ltrim($href, '/');
+        $url = $basePath ? $basePath . '/' . $href : $href;
+        echo '<link rel="stylesheet" href="' . htmlspecialchars($url) . '">' . "\n";
+    }
+}
+if (!empty($pageCssExt)) {
+    foreach ($pageCssExt as $url) {
         echo '<link rel="stylesheet" href="' . htmlspecialchars($url) . '">' . "\n";
     }
 }
 ?>
 <title><?= htmlspecialchars($pageTitle ?? 'ProTech'); ?></title>
-

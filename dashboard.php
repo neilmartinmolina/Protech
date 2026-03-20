@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/app.php';
-require_once __DIR__ . '/modal.php';
+require_once __DIR__ . '/includes/modal.php';
 
 use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\PHPMailer;
@@ -392,51 +392,16 @@ if ($role === 'seller') {
     }
 }
 
-$pageTitle = ucfirst($role) . ' Dashboard — ProTech';
+require_once __DIR__ . '/includes/modal.php';
+
+$pageTitle   = ucfirst($role) . ' Dashboard — ProTech';
+$pageCss     = ['admin.css', 'dashboard.css'];
+$pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/header.php'; ?>
-    <link rel="stylesheet" href="admin.css">
-    <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <style>
-        .panel-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.25rem; }
-        .panel-card h4 { color: var(--text-primary); font-size: 1rem; margin-bottom: 1rem; }
-        .pill { display: inline-block; padding: .25rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 600; }
-        .pill.pending    { background: rgba(245,158,11,.12); color: var(--warning); }
-        .pill.placed,
-        .pill.processing { background: rgba(59,130,246,.12);  color: #8ec5ff; }
-        .pill.completed,
-        .pill.approved   { background: rgba(16,185,129,.12);  color: var(--success); }
-        .pill.cancelled,
-        .pill.rejected   { background: rgba(239,68,68,.12);   color: #ff9e9e; }
-        .flash { border-radius: 12px; padding: .9rem 1rem; margin-bottom: 1rem; }
-        .flash.success { background: rgba(16,185,129,.12); color: #7cf2bf; }
-        .flash.warning { background: rgba(245,158,11,.12); color: #ffd479; }
-        .flash.danger  { background: rgba(239,68,68,.12);  color: #ff9e9e; }
-        .approve-btn, .reject-btn, .edit-btn, .status-btn, .add-product-btn {
-            border-radius: 10px; padding: .55rem .85rem; font-size: .82rem; font-weight: 600; border: none; cursor: pointer;
-        }
-        .approve-btn, .edit-btn, .add-product-btn, .status-btn { background: var(--primary); color: #fff; }
-        .reject-btn { background: transparent; border: 1px solid rgba(239,68,68,.45); color: #ff9e9e; }
-        .action-stack { display: flex; gap: .5rem; flex-wrap: wrap; }
-
-        /* Application reason tooltip */
-        .reason-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: .82rem; }
-
-        .chart-card { min-height: 360px; }
-        .chart-wrap { position: relative; height: 280px; }
-        .modal-form-grid { display: grid; gap: .9rem; }
-        .modal-form-grid.two-col { grid-template-columns: repeat(2, minmax(0,1fr)); }
-        .modal-form-grid .full { grid-column: 1 / -1; }
-        .modal-form-grid label { color: var(--text-secondary); font-size: .85rem; margin-bottom: .35rem; display: block; }
-        .modal-form-grid input,
-        .modal-form-grid select,
-        .modal-form-grid textarea { width: 100%; background: var(--surface-light); border: 1px solid var(--border); color: var(--text-primary); border-radius: 10px; padding: .75rem .85rem; }
-        .modal-form-grid textarea { min-height: 90px; resize: vertical; }
-        @media (max-width: 767.98px) { .modal-form-grid.two-col { grid-template-columns: 1fr; } }
-    </style>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
 <div class="admin-layout">

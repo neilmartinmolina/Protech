@@ -162,182 +162,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pageTitle = 'My Profile — ProTech';
+$pageTitle   = 'My Profile — ProTech';
+$pageCss     = ['my_profile.css'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/header.php'; ?>
-    <style>
-        /* ── Shell ───────────────────────────────────────────── */
-        .profile-shell { padding: 7rem 0 4rem; min-height: 100vh; }
-
-        /* ── Layout ──────────────────────────────────────────── */
-        .profile-layout {
-            display: grid;
-            grid-template-columns: 260px 1fr;
-            gap: 1.5rem;
-            align-items: start;
-        }
-        @media (max-width: 991.98px) {
-            .profile-layout { grid-template-columns: 1fr; }
-        }
-
-        /* ── Sidebar ─────────────────────────────────────────── */
-        .profile-sidebar {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 1.25rem;
-            box-shadow: var(--shadow-sm);
-            position: sticky;
-            top: 5.5rem;
-        }
-        .sidebar-user {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            padding-bottom: 1.25rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 1.25rem;
-        }
-        .sidebar-avatar {
-            width: 72px; height: 72px;
-            border-radius: 50%;
-            background: rgba(255,115,21,.12);
-            color: var(--primary);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.8rem;
-            margin-bottom: .75rem;
-            overflow: hidden; flex-shrink: 0;
-        }
-        .sidebar-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .sidebar-name { font-weight: 700; color: var(--text-primary); font-size: 1rem; line-height: 1.3; margin-bottom: .2rem; }
-        .sidebar-role { font-size: .8rem; color: var(--text-muted); text-transform: capitalize; }
-        .sidebar-nav { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .25rem; }
-        .sidebar-nav-section { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); padding: .75rem .75rem .35rem; }
-        .sidebar-nav a {
-            display: flex; align-items: center; gap: .75rem;
-            padding: .65rem .85rem; border-radius: 12px;
-            color: var(--text-secondary); text-decoration: none;
-            font-size: .9rem; font-weight: 500;
-            transition: background .15s, color .15s;
-        }
-        .sidebar-nav a i { width: 16px; text-align: center; opacity: .7; }
-        .sidebar-nav a:hover { background: var(--surface-light); color: var(--text-primary); }
-        .sidebar-nav a.active { background: rgba(255,115,21,.1); color: var(--primary); font-weight: 600; }
-        .sidebar-nav a.active i { opacity: 1; }
-        @media (max-width: 991.98px) {
-            .profile-sidebar { position: static; padding: 1rem; }
-            .sidebar-user { display: none; }
-            .sidebar-nav { flex-direction: row; overflow-x: auto; gap: .5rem; padding-bottom: .25rem; }
-            .sidebar-nav-section { display: none; }
-            .sidebar-nav a { white-space: nowrap; padding: .5rem .9rem; border-radius: 999px; font-size: .83rem; }
-        }
-
-        /* ── Cards ───────────────────────────────────────────── */
-        .profile-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 1.75rem;
-            box-shadow: var(--shadow-sm);
-            margin-bottom: 1.5rem;
-        }
-        .profile-card:last-child { margin-bottom: 0; }
-        .card-header-row {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;
-        }
-
-        /* ── Detail grid ─────────────────────────────────────── */
-        .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
-        @media (max-width: 575.98px) { .detail-grid { grid-template-columns: 1fr; } }
-        .detail-item { background: var(--surface-light); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; }
-        .detail-item small { color: var(--text-muted); display: block; margin-bottom: .35rem; font-size: .78rem; }
-        .detail-item strong { color: var(--text-primary); font-size: .95rem; }
-
-        /* ── Empty states ────────────────────────────────────── */
-        .empty-state { text-align: center; padding: 2.5rem 1rem; border: 2px dashed var(--border); border-radius: 14px; color: var(--text-muted); }
-        .empty-state i { font-size: 2rem; margin-bottom: .75rem; opacity: .4; display: block; }
-
-        /* ── Forms ───────────────────────────────────────────── */
-        .form-shell { display: none; margin-top: 1.25rem; }
-        .form-shell.open { display: block; }
-        .form-control {
-            background: var(--surface-light); border: 1px solid var(--border);
-            color: var(--text-primary); border-radius: 12px; padding: .8rem .95rem;
-        }
-        .form-control:focus {
-            background: var(--surface-light); color: var(--text-primary);
-            border-color: var(--primary); box-shadow: 0 0 0 4px rgba(255,115,21,.1);
-        }
-        textarea.form-control { resize: vertical; min-height: 90px; }
-
-        /* ── Buttons ─────────────────────────────────────────── */
-        .action-btn {
-            background: var(--primary); color: #fff; border: none;
-            border-radius: 12px; padding: .75rem 1.25rem;
-            font-weight: 600; font-size: .9rem; cursor: pointer; transition: opacity .15s;
-        }
-        .action-btn:hover { opacity: .88; }
-        .ghost-btn {
-            background: transparent; color: var(--text-secondary);
-            border: 1px solid var(--border); border-radius: 12px;
-            padding: .75rem 1.25rem; font-weight: 600; font-size: .9rem;
-            cursor: pointer; transition: background .15s, color .15s;
-        }
-        .ghost-btn:hover { background: var(--surface-light); color: var(--text-primary); }
-
-        /* ── Flash ───────────────────────────────────────────── */
-        .flash { border-radius: 14px; padding: .95rem 1rem; margin-bottom: 1.25rem; font-size: .9rem; }
-        .flash.success { background: rgba(16,185,129,.12); color: #7cf2bf; }
-        .flash.danger  { background: rgba(239,68,68,.12);  color: #ffaaaa; }
-
-        /* ── Order badge ─────────────────────────────────────── */
-        .order-status {
-            display: inline-block; font-size: .72rem; font-weight: 600;
-            padding: .2rem .6rem; border-radius: 999px;
-            background: rgba(255,115,21,.12); color: var(--primary);
-            text-transform: capitalize;
-        }
-
-        /* ── Application status banner ───────────────────────── */
-        .app-status-banner {
-            border-radius: 14px; padding: 1.25rem 1.5rem;
-            display: flex; align-items: flex-start; gap: 1rem;
-        }
-        .app-status-banner.pending  { background: rgba(245,158,11,.1);  border: 1px solid rgba(245,158,11,.25); }
-        .app-status-banner.approved { background: rgba(16,185,129,.1);  border: 1px solid rgba(16,185,129,.25); }
-        .app-status-banner.rejected { background: rgba(239,68,68,.1);   border: 1px solid rgba(239,68,68,.25); }
-        .app-status-banner .banner-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: .1rem; }
-        .app-status-banner.pending  .banner-icon { color: #f59e0b; }
-        .app-status-banner.approved .banner-icon { color: #10b981; }
-        .app-status-banner.rejected .banner-icon { color: #ef4444; }
-        .app-status-banner .banner-title { font-weight: 700; color: var(--text-primary); margin-bottom: .2rem; }
-        .app-status-banner .banner-sub   { font-size: .85rem; color: var(--text-secondary); }
-
-        /* ── Seller CTA card ─────────────────────────────────── */
-        .seller-cta {
-            border: 1px dashed rgba(255,115,21,.4);
-            border-radius: 16px; padding: 2rem;
-            text-align: center; background: rgba(255,115,21,.04);
-        }
-        .seller-cta-icon { font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem; opacity: .8; }
-        .seller-cta h3 { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-bottom: .5rem; }
-        .seller-cta p { font-size: .88rem; color: var(--text-muted); margin-bottom: 1.5rem; max-width: 380px; margin-left: auto; margin-right: auto; }
-
-        /* ── Stub badge ──────────────────────────────────────── */
-        .stub-badge {
-            display: inline-block; font-size: .7rem; padding: .15rem .55rem;
-            border-radius: 999px; background: rgba(99,102,241,.12); color: #a5b4fc;
-            font-weight: 600; margin-left: .5rem; vertical-align: middle;
-        }
-    </style>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 </head>
 <body>
-<?php include __DIR__ . '/navbar.php'; ?>
+<?php include __DIR__ . '/includes/navbar.php'; ?>
 
 <section class="profile-shell">
     <div class="container">
@@ -630,7 +464,7 @@ $pageTitle = 'My Profile — ProTech';
     </div>
 </section>
 
-<?php include __DIR__ . '/footer.php'; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>
 <script>
 (() => {
     const editShell = document.getElementById('editFormShell');
