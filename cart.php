@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'check
 
 $items = app_cart_items();
 $subtotal = app_cart_total();
-?>
+?>  
 <!DOCTYPE html>
 <html lang="en">
 <head>

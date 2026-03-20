@@ -7,10 +7,14 @@ $conn = app_db();
 $products = [];
 $brands = [];
 $result = $conn->query("
-    SELECT id, name, brand, category, description, price, stock, icon_class
-    FROM products
-    WHERE is_active = 1
-    ORDER BY created_at DESC, id DESC
+    SELECT p.id, p.name, p.description, p.price, p.stock, p.icon_class,
+           b.name AS brand,
+           c.name AS category
+    FROM products p
+    LEFT JOIN brands b     ON b.id = p.brand_id
+    LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.is_active = 1
+    ORDER BY p.created_at DESC, p.id DESC
 ");
 
 while ($row = $result->fetch_assoc()) {

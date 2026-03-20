@@ -20,3 +20,4 @@ if (!empty($pageCss) && is_array($pageCss)) {
 }
 ?>
 <title><?= htmlspecialchars($pageTitle ?? 'ProTech'); ?></title>
+

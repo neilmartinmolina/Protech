@@ -14,6 +14,7 @@ define('SMTP_PASS',   'yyio jctx phof utie');
 define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
 define('FROM_NAME',   'Protech');
 
+
 // Also mirror these into $_ENV / getenv so they still behave like env vars
 $keys = [
     'DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME',
