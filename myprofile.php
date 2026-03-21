@@ -465,6 +465,7 @@ $pageCss     = ['my_profile.css'];
 </section>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+<?php include __DIR__ . '/includes/scripts.php'; ?>
 <script>
 (() => {
     const editShell = document.getElementById('editFormShell');

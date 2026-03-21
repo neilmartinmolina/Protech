@@ -94,6 +94,7 @@ $subtotal = app_cart_total();
 </section>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+<?php include __DIR__ . '/includes/scripts.php'; ?>
 <script>
 (() => {
     async function cartAction(action, productId, quantity = 1) {

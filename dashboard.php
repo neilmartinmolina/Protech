@@ -437,8 +437,8 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     </div>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-dark shadow">
-                    <li><a class="dropdown-item" href="my_profile.php"><i class="fa-solid fa-user me-2"></i>View Profile</a></li>
-                    <li><a class="dropdown-item" href="my_profile.php?section=security"><i class="fa-solid fa-gear me-2"></i>Settings</a></li>
+                    <li><a class="dropdown-item" href="myprofile.php"><i class="fa-solid fa-user me-2"></i>View Profile</a></li>
+                    <li><a class="dropdown-item" href="myprofile.php?section=security"><i class="fa-solid fa-gear me-2"></i>Settings</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item" href="logout.php"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Logout</a></li>
                 </ul>

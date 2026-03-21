@@ -50,7 +50,7 @@ if ($navUser && ($navUser['role'] ?? '') === 'seller') {
                         <?php endif; ?>
                     </a>
                     <div class="dropdown">
-                        <a href="#" class="nav-link" data-bs-toggle="dropdown" aria-expanded="false" title="<?= app_sanitize($navUser['email']) ?>">
+                        <a href="#" role="button" class="nav-link" data-bs-toggle="dropdown" aria-expanded="false" title="<?= app_sanitize($navUser['email']) ?>">
                             <?php if ($avatarUrl): ?>
                                 <img src="<?= app_sanitize($avatarUrl) ?>" alt="Profile" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">
                             <?php else: ?>
@@ -61,7 +61,7 @@ if ($navUser && ($navUser['role'] ?? '') === 'seller') {
                             <?php if ($showDashboardLink): ?>
                                 <li><a class="dropdown-item" href="dashboard.php"><i class="fa-solid fa-table-columns me-2"></i><?= app_sanitize($dashboardLabel) ?></a></li>
                             <?php endif; ?>
-                            <li><a class="dropdown-item" href="my_profile.php"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
+                            <li><a class="dropdown-item" href="myprofile.php"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="logout.php"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Logout</a></li>
                         </ul>
