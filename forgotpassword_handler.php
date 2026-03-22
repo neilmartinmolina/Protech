@@ -88,8 +88,8 @@ if ($action === 'request') {
 
     // ── Rate limit: max 3 reset requests per email per hour ──────────────────
     $hourAgo = date('Y-m-d H:i:s', time() - 3600);
-    $stmtR   = $conn->prepare('SELECT COUNT(*) FROM password_resets WHERE user_id = ? AND created_at > ? AND used_at IS NULL');
-    $stmtR->bind_param('is', $user['id'], $hourAgo);
+    $stmtR   = $conn->prepare('SELECT COUNT(*) FROM password_resets WHERE userId = ? AND created_at > ? AND used_at IS NULL');
+    $stmtR->bind_param('is', $user['userId'], $hourAgo);
     $stmtR->execute();
     $stmtR->bind_result($recentCount);
     $stmtR->fetch();
@@ -103,8 +103,8 @@ if ($action === 'request') {
     }
 
     // ── Invalidate any existing unused tokens for this user ───────────────────
-    $stmtD = $conn->prepare('DELETE FROM password_resets WHERE user_id = ? AND used_at IS NULL');
-    $stmtD->bind_param('i', $user['id']);
+    $stmtD = $conn->prepare('DELETE FROM password_resets WHERE userId = ? AND used_at IS NULL');
+    $stmtD->bind_param('i', $user['userId']);
     $stmtD->execute();
     $stmtD->close();
 
@@ -113,7 +113,7 @@ if ($action === 'request') {
     $expiresAt = date('Y-m-d H:i:s', time() + 3600);
 
     $stmtT = $conn->prepare('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)');
-    $stmtT->bind_param('iss', $user['id'], $token, $expiresAt);
+    $stmtT->bind_param('iss', $user['userId'], $token, $expiresAt);
     $stmtT->execute();
     $stmtT->close();
     $conn->close();

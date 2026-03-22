@@ -28,8 +28,8 @@ function app_column_exists(mysqli $conn, string $table, string $column): bool
         SELECT 1
         FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
-          AND COLUMN_NAME = ?
+          AND TABLE_NAME   = ?
+          AND COLUMN_NAME  = ?
         LIMIT 1
     ");
     $stmt->bind_param('ss', $table, $column);
@@ -47,7 +47,7 @@ function app_table_exists(mysqli $conn, string $table): bool
         SELECT 1
         FROM information_schema.TABLES
         WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
+          AND TABLE_NAME   = ?
         LIMIT 1
     ");
     $stmt->bind_param('s', $table);
@@ -67,7 +67,7 @@ function app_ensure_schema(mysqli $conn): void
         return;
     }
 
-    // ── users columns ─────────────────────────────────────────
+    // ── users: add any missing columns ───────────────────────────────────────
     if (!app_column_exists($conn, 'users', 'role')) {
         $conn->query("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'customer' AFTER password_hash");
     }
@@ -87,47 +87,61 @@ function app_ensure_schema(mysqli $conn): void
     $conn->query("ALTER TABLE users MODIFY COLUMN role VARCHAR(20) NOT NULL DEFAULT 'customer'");
     $conn->query("UPDATE users SET role = 'customer' WHERE role = 'user' OR role = '' OR role IS NULL");
 
-    // ── login_attempts ────────────────────────────────────────
+    // ── login_attempts ────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS login_attempts (
-            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            ip VARCHAR(45) NOT NULL,
-            attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_ip_time (ip, attempted_at)
+            loginAttemptId INT UNSIGNED    AUTO_INCREMENT PRIMARY KEY,
+            ip             VARCHAR(45)     NOT NULL,
+            identifier     VARCHAR(255)    NOT NULL DEFAULT '',
+            attempted_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_la_ip_time       (ip, attempted_at),
+            INDEX idx_la_ip_identifier (ip, identifier)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
-    // ── verification_tokens ───────────────────────────────────
+    // ── remember_tokens ───────────────────────────────────────────────────────
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS remember_tokens (
+            rememberTokenId INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            userId          INT UNSIGNED  NOT NULL,
+            token_hash      CHAR(64)      NOT NULL,
+            expires_at      DATETIME      NOT NULL,
+            created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_rt_token_hash (token_hash),
+            KEY fk_rt_userId (userId)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    // ── verification_tokens ───────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS verification_tokens (
-            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id INT UNSIGNED NOT NULL,
-            token VARCHAR(64) NOT NULL,
-            expires_at DATETIME NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_token (token),
-            INDEX idx_token (token),
-            INDEX idx_expires (expires_at)
+            verificationTokenId INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            userId              INT UNSIGNED  NOT NULL,
+            token               VARCHAR(64)   NOT NULL,
+            expires_at          DATETIME      NOT NULL,
+            created_at          DATETIME      DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_vt_token  (token),
+            INDEX      idx_vt_expires (expires_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
-    // ── categories lookup ─────────────────────────────────────
+    // ── categories ────────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS categories (
-            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            slug VARCHAR(100) NOT NULL,
+            categoryId INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name       VARCHAR(100)    NOT NULL,
+            slug       VARCHAR(100)    NOT NULL,
             UNIQUE KEY uq_slug (slug)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // ── brands lookup ─────────────────────────────────────────
+    // ── brands ────────────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS brands (
-            id INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            UNIQUE KEY uq_name (name)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            brandId INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name    VARCHAR(100)    NOT NULL,
+            UNIQUE KEY uq_brand_name (name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
     // Seed categories
@@ -151,25 +165,25 @@ function app_ensure_schema(mysqli $conn): void
         $s->close();
     }
 
-    // ── products (uses brand_id / category_id FKs) ────────────
+    // ── products ──────────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS products (
-            id          INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            seller_id   INT(10) UNSIGNED DEFAULT NULL,
-            name        VARCHAR(150) NOT NULL,
-            brand_id    INT(10) UNSIGNED DEFAULT NULL,
-            category_id INT(10) UNSIGNED DEFAULT NULL,
-            description TEXT DEFAULT NULL,
-            price       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            stock       INT NOT NULL DEFAULT 0,
-            icon_class  VARCHAR(100) NOT NULL DEFAULT 'fa-solid fa-box-open',
-            is_active   TINYINT(1) NOT NULL DEFAULT 1,
-            created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_brand_id    (brand_id),
-            INDEX idx_category_id (category_id),
-            INDEX idx_price       (price),
-            INDEX idx_seller      (seller_id)
+            productId    INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            sellerUserId INT(10) UNSIGNED  DEFAULT NULL,
+            name         VARCHAR(150)      NOT NULL,
+            brandId      INT(10) UNSIGNED  DEFAULT NULL,
+            categoryId   INT(10) UNSIGNED  DEFAULT NULL,
+            description  TEXT              DEFAULT NULL,
+            price        DECIMAL(10,2)     NOT NULL DEFAULT 0.00,
+            stock        INT               NOT NULL DEFAULT 0,
+            icon_class   VARCHAR(100)      NOT NULL DEFAULT 'fa-solid fa-box-open',
+            is_active    TINYINT(1)        NOT NULL DEFAULT 1,
+            created_at   DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at   DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_prod_brandId     (brandId),
+            INDEX idx_prod_categoryId  (categoryId),
+            INDEX idx_prod_price       (price),
+            INDEX idx_prod_sellerUserId (sellerUserId)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
@@ -177,143 +191,147 @@ function app_ensure_schema(mysqli $conn): void
         $conn->query("ALTER TABLE products ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at");
     }
 
-    // ── orders ────────────────────────────────────────────────
+    // ── orders ────────────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS orders (
-            id           INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id      INT(10) UNSIGNED NOT NULL,
-            seller_id    INT(10) UNSIGNED DEFAULT NULL,
-            total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            status       VARCHAR(30) NOT NULL DEFAULT 'placed',
-            created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_user   (user_id),
-            INDEX idx_seller (seller_id),
-            INDEX idx_status (status)
+            orderId      INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            userId       INT(10) UNSIGNED  NOT NULL,
+            sellerUserId INT(10) UNSIGNED  DEFAULT NULL,
+            total_amount DECIMAL(10,2)     NOT NULL DEFAULT 0.00,
+            status       VARCHAR(30)       NOT NULL DEFAULT 'placed',
+            created_at   DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ord_userId       (userId),
+            INDEX idx_ord_sellerUserId (sellerUserId),
+            INDEX idx_ord_status       (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
-
-    if (!app_column_exists($conn, 'orders', 'seller_id')) {
-        $conn->query("ALTER TABLE orders ADD COLUMN seller_id INT(10) UNSIGNED DEFAULT NULL AFTER user_id");
-        $conn->query("ALTER TABLE orders ADD INDEX idx_seller (seller_id)");
-    }
 
     $conn->query("ALTER TABLE orders MODIFY COLUMN status VARCHAR(30) NOT NULL DEFAULT 'placed'");
 
-    // ── order_items ───────────────────────────────────────────
+    // ── order_items ───────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS order_items (
-            id         INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            order_id   INT(10) UNSIGNED NOT NULL,
-            product_id INT(10) UNSIGNED NOT NULL,
-            quantity   INT NOT NULL DEFAULT 1,
-            unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_order   (order_id),
-            INDEX idx_product (product_id)
+            orderItemId  INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            orderId      INT(10) UNSIGNED  NOT NULL,
+            productId    INT(10) UNSIGNED  NOT NULL,
+            sellerUserId INT(10) UNSIGNED  DEFAULT NULL,
+            product_name VARCHAR(150)      NOT NULL DEFAULT '',
+            quantity     INT               NOT NULL DEFAULT 1,
+            unit_price   DECIMAL(10,2)     NOT NULL DEFAULT 0.00,
+            created_at   DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_oi_orderId      (orderId),
+            INDEX idx_oi_productId    (productId),
+            INDEX idx_oi_sellerUserId (sellerUserId)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
-    // ── seller_applications ───────────────────────────────────
+    // ── seller_applications ───────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS seller_applications (
-            id               INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id          INT(10) UNSIGNED NOT NULL,
-            store_name       VARCHAR(150) NOT NULL,
-            reason           TEXT DEFAULT NULL,
-            status           ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-            rejection_reason VARCHAR(255) DEFAULT NULL,
-            reviewed_by      INT(10) UNSIGNED DEFAULT NULL,
-            reviewed_at      DATETIME DEFAULT NULL,
-            created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY idx_user   (user_id),
-            KEY idx_status (status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            sellerApplicationId INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            userId              INT(10) UNSIGNED  NOT NULL,
+            store_name          VARCHAR(150)      NOT NULL,
+            reason              TEXT              DEFAULT NULL,
+            status              ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+            rejection_reason    VARCHAR(255)      DEFAULT NULL,
+            reviewedByUserId    INT(10) UNSIGNED  DEFAULT NULL,
+            reviewed_at         DATETIME          DEFAULT NULL,
+            created_at          DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_sapp_userId           (userId),
+            KEY idx_sapp_status           (status),
+            KEY idx_sapp_reviewedByUserId (reviewedByUserId)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // ── user_payment_methods ──────────────────────────────────
+    // ── user_payment_methods ──────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS user_payment_methods (
-            id            INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id       INT(10) UNSIGNED NOT NULL,
-            label         VARCHAR(100) DEFAULT NULL,
-            type          ENUM('card','gcash','maya','cod') NOT NULL,
-            masked_number VARCHAR(20) DEFAULT NULL,
-            is_default    TINYINT(1) DEFAULT 0,
-            created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY user_id (user_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            userPaymentMethodId INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            userId              INT(10) UNSIGNED  NOT NULL,
+            type                ENUM('gcash','cod') NOT NULL,
+            label               VARCHAR(100)      DEFAULT NULL,
+            gcash_name          VARCHAR(150)      DEFAULT NULL,
+            gcash_number        VARCHAR(20)       DEFAULT NULL,
+            is_default          TINYINT(1)        NOT NULL DEFAULT 0,
+            created_at          TIMESTAMP         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY fk_upm_userId (userId)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // ── user_addresses ────────────────────────────────────────
+    // ── user_addresses ────────────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS user_addresses (
-            id         INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id    INT(10) UNSIGNED NOT NULL,
-            label      VARCHAR(100) DEFAULT NULL,
-            street     TEXT NOT NULL,
-            city       VARCHAR(100) NOT NULL,
-            province   VARCHAR(100) DEFAULT NULL,
-            zip        VARCHAR(20) DEFAULT NULL,
-            is_default TINYINT(1) DEFAULT 0,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY user_id (user_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            userAddressId  INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            userId         INT(10) UNSIGNED  NOT NULL,
+            recipient_name VARCHAR(150)      NOT NULL,
+            phone          VARCHAR(20)       NOT NULL,
+            label          VARCHAR(100)      DEFAULT NULL,
+            street         TEXT              NOT NULL,
+            barangay       VARCHAR(100)      NOT NULL,
+            city           VARCHAR(100)      NOT NULL,
+            province       VARCHAR(100)      DEFAULT NULL,
+            zip            VARCHAR(20)       DEFAULT NULL,
+            is_default     TINYINT(1)        NOT NULL DEFAULT 0,
+            created_at     TIMESTAMP         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY fk_ua_userId (userId)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // ── Promote admin user ────────────────────────────────────
+    // ── Promote admin user ────────────────────────────────────────────────────
     $adminEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : 'neilmartinmolina@gmail.com';
     $stmt = $conn->prepare("UPDATE users SET role = 'admin', seller_status = 'approved' WHERE email = ?");
     $stmt->bind_param('s', $adminEmail);
     $stmt->execute();
     $stmt->close();
 
-    // ── Seed products ─────────────────────────────────────────
+    // ── Seed products ─────────────────────────────────────────────────────────
     $seedProducts = [
-        ['ProBook X1 Ultra',        'Lenovo',   'Laptops',     '15.6-inch 4K OLED with Intel i9, 32GB RAM, and 1TB SSD.',                    1499.00, 15, 'fa-solid fa-laptop'],
-        ['SlimBook Air 14',         'Acer',     'Laptops',     'Thin and light work laptop with all-day battery life.',                        899.00, 24, 'fa-solid fa-laptop'],
-        ['ZenWork Studio 16',       'ASUS',     'Laptops',     '16-inch creator laptop with RTX graphics and color-accurate display.',        1899.00,  9, 'fa-solid fa-laptop'],
-        ['TravelMate Lite 13',      'HP',       'Laptops',     'Compact business laptop with strong battery life for daily travel.',           749.00, 28, 'fa-solid fa-laptop'],
-        ['PowerEdge Gamer X',       'MSI',      'Laptops',     'Gaming laptop with fast refresh panel and high-end cooling.',                 1699.00, 11, 'fa-solid fa-laptop'],
-        ['TowerMax Pro 5000',       'ASUS',     'Desktops',    'Ryzen 9 desktop with RTX graphics for demanding workflows.',                  2299.00,  8, 'fa-solid fa-desktop'],
-        ['CompactDesk Mini',        'Dell',     'Desktops',    'Small-form-factor workstation for office and home setups.',                   1099.00, 18, 'fa-solid fa-server'],
-        ['CreatorCube X',           'HP',       'Desktops',    'Quiet desktop tower tuned for design, editing, and multitasking.',            1399.00, 13, 'fa-solid fa-computer'],
-        ['OfficeCore SFF',          'Lenovo',   'Desktops',    'Reliable desktop for teams needing solid everyday performance.',               799.00, 31, 'fa-solid fa-desktop'],
-        ['RenderStation Z8',        'Acer',     'Desktops',    'High-memory workstation desktop designed for 3D and CAD workloads.',          2599.00,  6, 'fa-solid fa-server'],
-        ['MechStrike RGB Keyboard', 'Logitech', 'Peripherals', 'Mechanical keyboard with RGB lighting and hot-swappable switches.',            149.00, 45, 'fa-solid fa-keyboard'],
-        ['PrecisionGlide Mouse',    'Razer',    'Peripherals', 'Wireless ergonomic mouse with high-DPI sensor.',                               79.00, 56, 'fa-solid fa-computer-mouse'],
-        ['VisionPro 4K Monitor',    'Dell',     'Peripherals', '27-inch 4K IPS monitor with USB-C docking support.',                          499.00, 22, 'fa-solid fa-display'],
-        ['ClearVoice Headset',      'Logitech', 'Peripherals', 'Noise-cancelling headset for support, meetings, and streaming.',               119.00, 39, 'fa-solid fa-headset'],
-        ['DockHub Thunderbolt',     'Anker',    'Peripherals', 'Multi-port dock with dual display support and fast charging.',                 199.00, 27, 'fa-solid fa-plug'],
-        ['NetPro Wi-Fi 7 Router',   'TP-Link',  'Networking',  'Tri-band router with mesh-ready Wi-Fi 7 performance.',                        349.00, 20, 'fa-solid fa-wifi'],
-        ['SwitchPro 24-Port',       'Cisco',    'Networking',  'Managed gigabit switch with VLAN and PoE support.',                           249.00, 12, 'fa-solid fa-ethernet'],
-        ['MeshLink AX3000',         'TP-Link',  'Networking',  'Dual-node mesh kit for whole-home wireless coverage.',                        279.00, 17, 'fa-solid fa-network-wired'],
-        ['SecureGate Firewall',     'Cisco',    'Networking',  'Small business firewall appliance with VPN and threat filtering.',             599.00,  7, 'fa-solid fa-shield-halved'],
-        ['CloudBridge Access Point','Ubiquiti', 'Networking',  'Ceiling-mount access point for stable office Wi-Fi.',                         189.00, 26, 'fa-solid fa-tower-broadcast'],
+        ['ProBook X1 Ultra',         'Lenovo',   'Laptops',     '15.6-inch 4K OLED with Intel i9, 32GB RAM, and 1TB SSD.',                  1499.00, 15, 'fa-solid fa-laptop'],
+        ['SlimBook Air 14',          'Acer',     'Laptops',     'Thin and light work laptop with all-day battery life.',                      899.00, 24, 'fa-solid fa-laptop'],
+        ['ZenWork Studio 16',        'ASUS',     'Laptops',     '16-inch creator laptop with RTX graphics and color-accurate display.',      1899.00,  9, 'fa-solid fa-laptop'],
+        ['TravelMate Lite 13',       'HP',       'Laptops',     'Compact business laptop with strong battery life for daily travel.',         749.00, 28, 'fa-solid fa-laptop'],
+        ['PowerEdge Gamer X',        'MSI',      'Laptops',     'Gaming laptop with fast refresh panel and high-end cooling.',               1699.00, 11, 'fa-solid fa-laptop'],
+        ['TowerMax Pro 5000',        'ASUS',     'Desktops',    'Ryzen 9 desktop with RTX graphics for demanding workflows.',                2299.00,  8, 'fa-solid fa-desktop'],
+        ['CompactDesk Mini',         'Dell',     'Desktops',    'Small-form-factor workstation for office and home setups.',                 1099.00, 18, 'fa-solid fa-server'],
+        ['CreatorCube X',            'HP',       'Desktops',    'Quiet desktop tower tuned for design, editing, and multitasking.',          1399.00, 13, 'fa-solid fa-computer'],
+        ['OfficeCore SFF',           'Lenovo',   'Desktops',    'Reliable desktop for teams needing solid everyday performance.',              799.00, 31, 'fa-solid fa-desktop'],
+        ['RenderStation Z8',         'Acer',     'Desktops',    'High-memory workstation desktop designed for 3D and CAD workloads.',        2599.00,  6, 'fa-solid fa-server'],
+        ['MechStrike RGB Keyboard',  'Logitech', 'Peripherals', 'Mechanical keyboard with RGB lighting and hot-swappable switches.',          149.00, 45, 'fa-solid fa-keyboard'],
+        ['PrecisionGlide Mouse',     'Razer',    'Peripherals', 'Wireless ergonomic mouse with high-DPI sensor.',                             79.00, 56, 'fa-solid fa-computer-mouse'],
+        ['VisionPro 4K Monitor',     'Dell',     'Peripherals', '27-inch 4K IPS monitor with USB-C docking support.',                        499.00, 22, 'fa-solid fa-display'],
+        ['ClearVoice Headset',       'Logitech', 'Peripherals', 'Noise-cancelling headset for support, meetings, and streaming.',             119.00, 39, 'fa-solid fa-headset'],
+        ['DockHub Thunderbolt',      'Anker',    'Peripherals', 'Multi-port dock with dual display support and fast charging.',               199.00, 27, 'fa-solid fa-plug'],
+        ['NetPro Wi-Fi 7 Router',    'TP-Link',  'Networking',  'Tri-band router with mesh-ready Wi-Fi 7 performance.',                      349.00, 20, 'fa-solid fa-wifi'],
+        ['SwitchPro 24-Port',        'Cisco',    'Networking',  'Managed gigabit switch with VLAN and PoE support.',                         249.00, 12, 'fa-solid fa-ethernet'],
+        ['MeshLink AX3000',          'TP-Link',  'Networking',  'Dual-node mesh kit for whole-home wireless coverage.',                      279.00, 17, 'fa-solid fa-network-wired'],
+        ['SecureGate Firewall',      'Cisco',    'Networking',  'Small business firewall appliance with VPN and threat filtering.',           599.00,  7, 'fa-solid fa-shield-halved'],
+        ['CloudBridge Access Point', 'Ubiquiti', 'Networking',  'Ceiling-mount access point for stable office Wi-Fi.',                       189.00, 26, 'fa-solid fa-tower-broadcast'],
     ];
 
-    $checkStmt  = $conn->prepare("SELECT id FROM products WHERE name = ? LIMIT 1");
-    $getBrandId = $conn->prepare("SELECT id FROM brands WHERE name = ? LIMIT 1");
-    $getCatId   = $conn->prepare("SELECT id FROM categories WHERE name = ? LIMIT 1");
+    $checkStmt  = $conn->prepare("SELECT productId FROM products WHERE name = ? LIMIT 1");
+    $getBrandId = $conn->prepare("SELECT brandId FROM brands WHERE name = ? LIMIT 1");
+    $getCatId   = $conn->prepare("SELECT categoryId FROM categories WHERE name = ? LIMIT 1");
     $insertStmt = $conn->prepare("
-        INSERT INTO products (name, brand_id, category_id, description, price, stock, icon_class)
+        INSERT INTO products (name, brandId, categoryId, description, price, stock, icon_class)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($seedProducts as [$name, $brand, $category, $description, $price, $stock, $iconClass]) {
         $checkStmt->bind_param('s', $name);
         $checkStmt->execute();
-        $exists = $checkStmt->get_result()->fetch_assoc();
-        if ($exists) continue;
+        if ($checkStmt->get_result()->fetch_assoc()) {
+            continue;
+        }
 
         $getBrandId->bind_param('s', $brand);
         $getBrandId->execute();
         $brandRow = $getBrandId->get_result()->fetch_assoc();
-        $brandId  = $brandRow['id'] ?? null;
+        $brandId  = $brandRow['brandId'] ?? null;
 
         $getCatId->bind_param('s', $category);
         $getCatId->execute();
         $catRow     = $getCatId->get_result()->fetch_assoc();
-        $categoryId = $catRow['id'] ?? null;
+        $categoryId = $catRow['categoryId'] ?? null;
 
         $insertStmt->bind_param('siisdis', $name, $brandId, $categoryId, $description, $price, $stock, $iconClass);
         $insertStmt->execute();
@@ -325,7 +343,7 @@ function app_ensure_schema(mysqli $conn): void
     $insertStmt->close();
 
     $ready = true;
-    // ── END app_ensure_schema ─────────────────────────────────
+    // ── END app_ensure_schema ─────────────────────────────────────────────────
 }
 
 function app_current_user(): ?array
@@ -337,9 +355,10 @@ function app_refresh_session_user(int $userId): ?array
 {
     $conn = app_db();
     $stmt = $conn->prepare("
-        SELECT id, first_name, last_name, username, email, role, seller_status, store_name, avatar_path
+        SELECT userId, first_name, last_name, username, email,
+               role, seller_status, store_name, avatar_path
         FROM users
-        WHERE id = ?
+        WHERE userId = ?
         LIMIT 1
     ");
     $stmt->bind_param('i', $userId);
@@ -353,7 +372,7 @@ function app_refresh_session_user(int $userId): ?array
     }
 
     $_SESSION['user'] = [
-        'id'            => (int) $user['id'],
+        'userId'        => (int) $user['userId'],
         'firstName'     => $user['first_name'],
         'lastName'      => $user['last_name'],
         'username'      => $user['username'],
@@ -376,7 +395,7 @@ function app_require_login(): array
         exit;
     }
 
-    return app_refresh_session_user((int) $user['id']) ?? $user;
+    return app_refresh_session_user((int) $user['userId']) ?? $user;
 }
 
 function app_is_admin(array $user): bool
@@ -416,13 +435,14 @@ function app_cart_items(): array
 
     $conn = app_db();
     $stmt = $conn->prepare("
-        SELECT p.id, p.name, p.description, p.price, p.stock, p.icon_class,
+        SELECT p.productId, p.name, p.description, p.price, p.stock, p.icon_class,
                b.name AS brand,
                c.name AS category
-        FROM products p
-        LEFT JOIN brands b     ON b.id = p.brand_id
-        LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.id IN ($placeholders) AND p.is_active = 1
+        FROM   products    p
+        LEFT JOIN brands     b ON b.brandId    = p.brandId
+        LEFT JOIN categories c ON c.categoryId = p.categoryId
+        WHERE  p.productId IN ($placeholders)
+          AND  p.is_active = 1
     ");
     $stmt->bind_param($types, ...$productIds);
     $stmt->execute();
@@ -430,14 +450,14 @@ function app_cart_items(): array
 
     $items = [];
     while ($row = $result->fetch_assoc()) {
-        $qty            = max(1, (int) ($cart[$row['id']] ?? 1));
+        $qty               = max(1, (int) ($cart[$row['productId']] ?? 1));
         $row['quantity']   = $qty;
         $row['line_total'] = $qty * (float) $row['price'];
-        $items[] = $row;
+        $items[]           = $row;
     }
     $stmt->close();
 
-    usort($items, fn ($a, $b) => $a['id'] <=> $b['id']);
+    usort($items, fn ($a, $b) => $a['productId'] <=> $b['productId']);
 
     return $items;
 }
@@ -523,12 +543,7 @@ function app_store_avatar(array $file, ?string $existingPath = null): array
 
 function app_avatar_url(?array $user): ?string
 {
-    $path = $user['avatar_path'] ?? null;
-    if (!$path) {
-        return null;
-    }
-
-    return $path;
+    return $user['avatar_path'] ?? null;
 }
 
 function app_seller_owns_product(array $user, int $productId): bool
@@ -538,8 +553,12 @@ function app_seller_owns_product(array $user, int $productId): bool
     }
 
     $conn = app_db();
-    $stmt = $conn->prepare('SELECT id FROM products WHERE id = ? AND seller_id = ? LIMIT 1');
-    $stmt->bind_param('ii', $productId, $user['id']);
+    $stmt = $conn->prepare('
+        SELECT productId FROM products
+        WHERE productId = ? AND sellerUserId = ?
+        LIMIT 1
+    ');
+    $stmt->bind_param('ii', $productId, $user['userId']);
     $stmt->execute();
     $exists = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -551,12 +570,12 @@ function app_get_orders_for_customer(int $userId): array
 {
     $conn = app_db();
     $stmt = $conn->prepare("
-        SELECT o.id, o.total_amount, o.status, o.created_at,
-               COUNT(oi.id) AS item_count
-        FROM orders o
-        LEFT JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.user_id = ?
-        GROUP BY o.id, o.total_amount, o.status, o.created_at
+        SELECT o.orderId, o.total_amount, o.status, o.created_at,
+               COUNT(oi.orderItemId) AS item_count
+        FROM       orders      o
+        LEFT JOIN  order_items oi ON oi.orderId = o.orderId
+        WHERE o.userId = ?
+        GROUP BY o.orderId, o.total_amount, o.status, o.created_at
         ORDER BY o.created_at DESC
     ");
     $stmt->bind_param('i', $userId);
@@ -573,15 +592,15 @@ function app_get_orders_for_seller(?int $sellerId = null): array
 
     if ($sellerId === null) {
         $stmt = $conn->prepare("
-            SELECT o.id, o.user_id, o.seller_id, o.total_amount, o.status, o.created_at,
-                   CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
+            SELECT o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
+                   CONCAT(u.first_name, ' ', u.last_name)          AS customer_name,
                    COALESCE(s.store_name, s.username, 'Marketplace') AS seller_name,
-                   COUNT(oi.id) AS item_count
-            FROM orders o
-            JOIN users u ON u.id = o.user_id
-            LEFT JOIN users s ON s.id = o.seller_id
-            LEFT JOIN order_items oi ON oi.order_id = o.id
-            GROUP BY o.id, o.user_id, o.seller_id, o.total_amount, o.status, o.created_at,
+                   COUNT(oi.orderItemId)                             AS item_count
+            FROM       orders      o
+            JOIN       users       u  ON u.userId      = o.userId
+            LEFT JOIN  users       s  ON s.userId      = o.sellerUserId
+            LEFT JOIN  order_items oi ON oi.orderId    = o.orderId
+            GROUP BY o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
                      u.first_name, u.last_name, s.store_name, s.username
             ORDER BY o.created_at DESC
         ");
@@ -592,17 +611,17 @@ function app_get_orders_for_seller(?int $sellerId = null): array
     }
 
     $stmt = $conn->prepare("
-    SELECT o.id, o.user_id, o.seller_id, o.total_amount, o.status, o.created_at,
-           CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
-           COUNT(oi.id) AS item_count
-    FROM orders o
-    JOIN users u ON u.id = o.user_id
-    LEFT JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.seller_id = ?
-    GROUP BY o.id, o.user_id, o.seller_id, o.total_amount, o.status, o.created_at,
-             u.first_name, u.last_name
-    ORDER BY o.created_at DESC
-");
+        SELECT o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
+               CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
+               COUNT(oi.orderItemId)                   AS item_count
+        FROM       orders      o
+        JOIN       users       u  ON u.userId   = o.userId
+        LEFT JOIN  order_items oi ON oi.orderId = o.orderId
+        WHERE o.sellerUserId = ?
+        GROUP BY o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
+                 u.first_name, u.last_name
+        ORDER BY o.created_at DESC
+    ");
     $stmt->bind_param('i', $sellerId);
     $stmt->execute();
     $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -623,14 +642,14 @@ function app_checkout(int $userId): array
     $conn->begin_transaction();
 
     try {
-        $productIds   = array_map(fn ($item) => (int) $item['id'], $items);
+        $productIds   = array_map(fn ($item) => (int) $item['productId'], $items);
         $placeholders = implode(',', array_fill(0, count($productIds), '?'));
         $types        = str_repeat('i', count($productIds));
 
         $stmt = $conn->prepare("
-            SELECT id, seller_id, stock, price, is_active, name
+            SELECT productId, sellerUserId, stock, price, is_active, name
             FROM products
-            WHERE id IN ($placeholders)
+            WHERE productId IN ($placeholders)
             FOR UPDATE
         ");
         $stmt->bind_param($types, ...$productIds);
@@ -638,13 +657,13 @@ function app_checkout(int $userId): array
         $result     = $stmt->get_result();
         $productMap = [];
         while ($row = $result->fetch_assoc()) {
-            $productMap[(int) $row['id']] = $row;
+            $productMap[(int) $row['productId']] = $row;
         }
         $stmt->close();
 
         $grouped = [];
         foreach ($items as $item) {
-            $product = $productMap[(int) $item['id']] ?? null;
+            $product = $productMap[(int) $item['productId']] ?? null;
             if (!$product || !(int) $product['is_active']) {
                 throw new RuntimeException('One of the products in your cart is no longer available.');
             }
@@ -652,33 +671,38 @@ function app_checkout(int $userId): array
                 throw new RuntimeException('Insufficient stock for ' . $product['name'] . '.');
             }
 
-            $sellerKey = $product['seller_id'] !== null ? (string) (int) $product['seller_id'] : 'marketplace';
+            $sellerKey = $product['sellerUserId'] !== null
+                ? (string) (int) $product['sellerUserId']
+                : 'marketplace';
+
             if (!isset($grouped[$sellerKey])) {
                 $grouped[$sellerKey] = [
-                    'seller_id' => $product['seller_id'] !== null ? (int) $product['seller_id'] : null,
-                    'items'     => [],
-                    'total'     => 0.0,
+                    'sellerUserId' => $product['sellerUserId'] !== null ? (int) $product['sellerUserId'] : null,
+                    'items'        => [],
+                    'total'        => 0.0,
                 ];
             }
 
             $lineTotal = (float) $product['price'] * (int) $item['quantity'];
             $grouped[$sellerKey]['items'][] = [
-                'product_id' => (int) $product['id'],
+                'productId'  => (int) $product['productId'],
                 'quantity'   => (int) $item['quantity'],
                 'unit_price' => (float) $product['price'],
+                'name'       => $product['name'],
             ];
             $grouped[$sellerKey]['total'] += $lineTotal;
         }
 
-        $orderStmt            = $conn->prepare("INSERT INTO orders (user_id, seller_id, total_amount, status) VALUES (?, ?, ?, 'placed')");
-        $marketplaceOrderStmt = $conn->prepare("INSERT INTO orders (user_id, seller_id, total_amount, status) VALUES (?, NULL, ?, 'placed')");
-        $itemStmt             = $conn->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)");
-        $stockStmt            = $conn->prepare("UPDATE products SET stock = stock - ? WHERE id = ?");
+        $orderStmt            = $conn->prepare("INSERT INTO orders (userId, sellerUserId, total_amount, status) VALUES (?, ?, ?, 'placed')");
+        $marketplaceOrderStmt = $conn->prepare("INSERT INTO orders (userId, sellerUserId, total_amount, status) VALUES (?, NULL, ?, 'placed')");
+        $itemStmt             = $conn->prepare("INSERT INTO order_items (orderId, productId, sellerUserId, product_name, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)");
+        $stockStmt            = $conn->prepare("UPDATE products SET stock = stock - ? WHERE productId = ?");
 
         $createdOrderIds = [];
         foreach ($grouped as $group) {
-            $sellerId = $group['seller_id'];
+            $sellerId = $group['sellerUserId'];
             $total    = $group['total'];
+
             if ($sellerId === null) {
                 $marketplaceOrderStmt->bind_param('id', $userId, $total);
                 $marketplaceOrderStmt->execute();
@@ -690,9 +714,17 @@ function app_checkout(int $userId): array
             $createdOrderIds[] = $orderId;
 
             foreach ($group['items'] as $item) {
-                $itemStmt->bind_param('iiid', $orderId, $item['product_id'], $item['quantity'], $item['unit_price']);
+                $itemStmt->bind_param(
+                    'iiisid',
+                    $orderId,
+                    $item['productId'],
+                    $sellerId,
+                    $item['name'],
+                    $item['quantity'],
+                    $item['unit_price']
+                );
                 $itemStmt->execute();
-                $stockStmt->bind_param('ii', $item['quantity'], $item['product_id']);
+                $stockStmt->bind_param('ii', $item['quantity'], $item['productId']);
                 $stockStmt->execute();
             }
         }
@@ -719,15 +751,15 @@ function app_upsert_product(array $user, array $data): array
         return ['success' => false, 'message' => 'Unauthorized product action.'];
     }
 
-    $productId   = (int) ($data['product_id'] ?? 0);
-    $name        = trim($data['name']        ?? '');
-    $brandName   = trim($data['brand']       ?? '');
-    $categoryName= trim($data['category']    ?? '');
-    $description = trim($data['description'] ?? '');
-    $price       = (float) ($data['price']   ?? 0);
-    $stock       = max(0, (int) ($data['stock'] ?? 0));
-    $iconClass   = trim($data['icon_class']  ?? 'fa-solid fa-box-open');
-    $isActive    = !empty($data['is_active']) ? 1 : 0;
+    $productId    = (int)   ($data['product_id']  ?? 0);
+    $name         = trim(    $data['name']         ?? '');
+    $brandName    = trim(    $data['brand']        ?? '');
+    $categoryName = trim(    $data['category']     ?? '');
+    $description  = trim(    $data['description']  ?? '');
+    $price        = (float) ($data['price']        ?? 0);
+    $stock        = max(0, (int) ($data['stock']   ?? 0));
+    $iconClass    = trim(    $data['icon_class']   ?? 'fa-solid fa-box-open');
+    $isActive     = !empty(  $data['is_active'])  ? 1 : 0;
 
     if ($name === '' || $brandName === '' || $categoryName === '' || $description === '') {
         return ['success' => false, 'message' => 'Name, brand, category, and description are required.'];
@@ -738,16 +770,16 @@ function app_upsert_product(array $user, array $data): array
 
     $conn = app_db();
 
-    // Resolve brand_id — insert if new
-    $stmt = $conn->prepare("SELECT id FROM brands WHERE name = ? LIMIT 1");
+    // Resolve brandId — insert if new
+    $stmt = $conn->prepare("SELECT brandId FROM brands WHERE name = ? LIMIT 1");
     $stmt->bind_param('s', $brandName);
     $stmt->execute();
     $brandRow = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
     if ($brandRow) {
-        $brandId = (int) $brandRow['id'];
+        $brandId = (int) $brandRow['brandId'];
     } else {
-        $conn->prepare("INSERT INTO brands (name) VALUES (?)")->execute() || null;
         $s = $conn->prepare("INSERT INTO brands (name) VALUES (?)");
         $s->bind_param('s', $brandName);
         $s->execute();
@@ -755,14 +787,15 @@ function app_upsert_product(array $user, array $data): array
         $s->close();
     }
 
-    // Resolve category_id — insert if new
-    $stmt = $conn->prepare("SELECT id FROM categories WHERE name = ? LIMIT 1");
+    // Resolve categoryId — insert if new
+    $stmt = $conn->prepare("SELECT categoryId FROM categories WHERE name = ? LIMIT 1");
     $stmt->bind_param('s', $categoryName);
     $stmt->execute();
     $catRow = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
     if ($catRow) {
-        $categoryId = (int) $catRow['id'];
+        $categoryId = (int) $catRow['categoryId'];
     } else {
         $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $categoryName));
         $s = $conn->prepare("INSERT IGNORE INTO categories (name, slug) VALUES (?, ?)");
@@ -774,26 +807,28 @@ function app_upsert_product(array $user, array $data): array
 
     $sellerId = app_is_admin($user)
         ? (($data['seller_id'] ?? '') !== '' ? (int) $data['seller_id'] : null)
-        : (int) $user['id'];
+        : (int) $user['userId'];
 
     if ($productId > 0) {
         if (app_is_seller($user) && !app_seller_owns_product($user, $productId)) {
             return ['success' => false, 'message' => 'You can only edit your own products.'];
         }
+
         $stmt = $conn->prepare("
             UPDATE products
-            SET name = ?, brand_id = ?, category_id = ?, description = ?,
-                price = ?, stock = ?, icon_class = ?, is_active = ?, seller_id = ?
-            WHERE id = ?
+            SET name = ?, brandId = ?, categoryId = ?, description = ?,
+                price = ?, stock = ?, icon_class = ?, is_active = ?, sellerUserId = ?
+            WHERE productId = ?
         ");
         $stmt->bind_param('siisdisiii', $name, $brandId, $categoryId, $description, $price, $stock, $iconClass, $isActive, $sellerId, $productId);
         $stmt->execute();
         $stmt->close();
+
         return ['success' => true, 'message' => 'Product updated successfully.'];
     }
 
     $stmt = $conn->prepare("
-        INSERT INTO products (seller_id, name, brand_id, category_id, description, price, stock, icon_class, is_active)
+        INSERT INTO products (sellerUserId, name, brandId, categoryId, description, price, stock, icon_class, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->bind_param('isiisdisi', $sellerId, $name, $brandId, $categoryId, $description, $price, $stock, $iconClass, $isActive);

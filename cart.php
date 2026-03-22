@@ -7,7 +7,7 @@ $flash    = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'checkout') {
     $user = app_require_login();
-    $result = app_checkout((int) $user['id']);
+    $result = app_checkout((int) $user['userId']);
     $flash = [
         'type' => $result['success'] ? 'success' : 'danger',
         'message' => $result['success']
@@ -52,9 +52,9 @@ $subtotal = app_cart_total();
                 <div class="col-lg-8">
                     <div class="cart-card">
                         <?php foreach ($items as $item): ?>
-                            <div class="cart-item d-flex justify-content-between gap-3 flex-wrap" data-product-id="<?= (int) $item['id'] ?>">
+                            <div class="cart-item d-flex justify-content-between gap-3 flex-wrap" data-product-id="<?= (int) $item['productId'] ?>">
                                 <div>
-                                    <div class="text-muted small">#<?= (int) $item['id'] ?> • <?= app_sanitize($item['brand']) ?></div>
+                                    <div class="text-muted small">#<?= (int) $item['productId'] ?> • <?= app_sanitize($item['brand']) ?></div>
                                     <h5 class="text-white mb-1"><?= app_sanitize($item['name']) ?></h5>
                                     <div class="text-secondary"><?= app_sanitize($item['category']) ?></div>
                                     <div class="text-secondary small mt-2">$<?= number_format((float) $item['price'], 2) ?> each</div>

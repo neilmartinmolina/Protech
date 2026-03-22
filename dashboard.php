@@ -37,17 +37,16 @@ function dashboard_mailer(): PHPMailer
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ── Approve seller application ──────────────────────────
+    // ── Approve seller application ────────────────────────────────────────────
     if ($action === 'approve_seller' && app_is_admin($user)) {
         $applicationId = (int) ($_POST['application_id'] ?? 0);
 
-        // Pull the application + the applicant's user record in one join
         $stmt = $conn->prepare("
-            SELECT sa.id AS app_id, sa.user_id, sa.store_name,
+            SELECT sa.sellerApplicationId AS app_id, sa.userId, sa.store_name,
                    u.first_name, u.last_name, u.email, u.username
             FROM seller_applications sa
-            JOIN users u ON u.id = sa.user_id
-            WHERE sa.id = ? AND sa.status = 'pending'
+            JOIN users u ON u.userId = sa.userId
+            WHERE sa.sellerApplicationId = ? AND sa.status = 'pending'
             LIMIT 1
         ");
         $stmt->bind_param('i', $applicationId);
@@ -58,25 +57,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($application) {
             $conn->begin_transaction();
             try {
-                $reviewerId = (int) $user['id'];
-                $userId     = (int) $application['user_id'];
+                $reviewerId = (int) $user['userId'];
+                $userId     = (int) $application['userId'];
                 $storeName  = $application['store_name'];
 
                 // 1. Mark application approved
                 $stmt = $conn->prepare("
                     UPDATE seller_applications
-                    SET status = 'approved', reviewed_by = ?, reviewed_at = NOW()
-                    WHERE id = ?
+                    SET status = 'approved', reviewedByUserId = ?, reviewed_at = NOW()
+                    WHERE sellerApplicationId = ?
                 ");
                 $stmt->bind_param('ii', $reviewerId, $applicationId);
                 $stmt->execute();
                 $stmt->close();
 
-                // 2. Promote the user — do NOT touch password_hash, they already have one
+                // 2. Promote the user
                 $stmt = $conn->prepare("
                     UPDATE users
                     SET role = 'seller', seller_status = 'approved', store_name = ?
-                    WHERE id = ?
+                    WHERE userId = ?
                 ");
                 $stmt->bind_param('si', $storeName, $userId);
                 $stmt->execute();
@@ -119,17 +118,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ── Reject seller application ───────────────────────────
+    // ── Reject seller application ─────────────────────────────────────────────
     if ($action === 'reject_seller' && app_is_admin($user)) {
         $applicationId   = (int) ($_POST['application_id'] ?? 0);
         $rejectionReason = trim($_POST['rejection_reason'] ?? '');
 
         $stmt = $conn->prepare("
-            SELECT sa.id AS app_id, sa.user_id, sa.store_name,
+            SELECT sa.sellerApplicationId AS app_id, sa.userId, sa.store_name,
                    u.first_name, u.last_name, u.email
             FROM seller_applications sa
-            JOIN users u ON u.id = sa.user_id
-            WHERE sa.id = ? AND sa.status = 'pending'
+            JOIN users u ON u.userId = sa.userId
+            WHERE sa.sellerApplicationId = ? AND sa.status = 'pending'
             LIMIT 1
         ");
         $stmt->bind_param('i', $applicationId);
@@ -140,21 +139,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($application) {
             $conn->begin_transaction();
             try {
-                $reviewerId = (int) $user['id'];
-                $userId     = (int) $application['user_id'];
+                $reviewerId = (int) $user['userId'];
+                $userId     = (int) $application['userId'];
 
-                // 1. Mark application rejected with reason
+                // 1. Mark application rejected
                 $stmt = $conn->prepare("
                     UPDATE seller_applications
-                    SET status = 'rejected', rejection_reason = ?, reviewed_by = ?, reviewed_at = NOW()
-                    WHERE id = ?
+                    SET status = 'rejected', rejection_reason = ?, reviewedByUserId = ?, reviewed_at = NOW()
+                    WHERE sellerApplicationId = ?
                 ");
                 $stmt->bind_param('sii', $rejectionReason, $reviewerId, $applicationId);
                 $stmt->execute();
                 $stmt->close();
 
-                // 2. Reset seller_status on users so they can re-apply
-                $stmt = $conn->prepare("UPDATE users SET seller_status = 'rejected' WHERE id = ?");
+                // 2. Reset seller_status so they can re-apply
+                $stmt = $conn->prepare("UPDATE users SET seller_status = 'rejected' WHERE userId = ?");
                 $stmt->bind_param('i', $userId);
                 $stmt->execute();
                 $stmt->close();
@@ -200,24 +199,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ── Save product ──────────────────────────────────────────────────────────
     if ($action === 'save_product' && ($role === 'seller' || $role === 'admin')) {
         $result = app_upsert_product($user, $_POST);
-        $flash = ['type' => $result['success'] ? 'success' : 'danger', 'message' => $result['message']];
+        $flash  = ['type' => $result['success'] ? 'success' : 'danger', 'message' => $result['message']];
     }
 
+    // ── Update order status ───────────────────────────────────────────────────
     if ($action === 'update_order_status' && ($role === 'seller' || $role === 'admin')) {
-        $orderId = (int) ($_POST['order_id'] ?? 0);
-        $status  = trim($_POST['status'] ?? '');
+        $orderId         = (int) ($_POST['order_id'] ?? 0);
+        $status          = trim($_POST['status'] ?? '');
         $allowedStatuses = ['placed', 'processing', 'completed', 'cancelled'];
 
         if (!in_array($status, $allowedStatuses, true)) {
             $flash = ['type' => 'danger', 'message' => 'Invalid order status selected.'];
         } else {
             if ($role === 'seller') {
-                $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ? AND seller_id = ?');
-                $stmt->bind_param('sii', $status, $orderId, $user['id']);
+                $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE orderId = ? AND sellerUserId = ?');
+                $stmt->bind_param('sii', $status, $orderId, $user['userId']);
             } else {
-                $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+                $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE orderId = ?');
                 $stmt->bind_param('si', $status, $orderId);
             }
             $stmt->execute();
@@ -229,10 +230,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $user = app_refresh_session_user((int) $user['id']) ?? $user;
+    $user = app_refresh_session_user((int) $user['userId']) ?? $user;
     $role = $user['role'] ?? $role;
 }
 
+// ── Menus ─────────────────────────────────────────────────────────────────────
 $menus = [
     'admin' => [
         'dashboard' => ['Dashboard',        'fa-solid fa-house'],
@@ -255,26 +257,26 @@ $allowedTabs = $menus[$role] ?? $menus['seller'];
 $tab = $_GET['tab'] ?? array_key_first($allowedTabs);
 if (!isset($allowedTabs[$tab])) $tab = array_key_first($allowedTabs);
 
-$avatarUrl      = app_avatar_url($user);
+$avatarUrl           = app_avatar_url($user);
 $pendingApplications = [];
-$adminStats     = [];
-$adminOrders    = [];
-$adminProducts  = [];
-$sellerStats    = [];
-$sellerProducts = [];
-$sellerOrders   = [];
-$categories     = ['Laptops', 'Desktops', 'Peripherals', 'Networking'];
-$brands         = [];
+$adminStats          = [];
+$adminOrders         = [];
+$adminProducts       = [];
+$sellerStats         = [];
+$sellerProducts      = [];
+$sellerOrders        = [];
+$categories          = ['Laptops', 'Desktops', 'Peripherals', 'Networking'];
+$brands              = [];
 
-$brandResult = $conn->query('SELECT id, name FROM brands ORDER BY name ASC');
-if ($brandResult === false) {
-    $brands = [];
-} else {
+// Brands list uses new PK name
+$brandResult = $conn->query('SELECT brandId, name FROM brands ORDER BY name ASC');
+if ($brandResult !== false) {
     while ($row = $brandResult->fetch_assoc()) {
         $brands[] = $row['name'];
     }
 }
 
+// ── Admin data ────────────────────────────────────────────────────────────────
 if ($role === 'admin') {
     $queries = [
         'users'           => "SELECT COUNT(*) AS c FROM users WHERE role = 'customer'",
@@ -285,11 +287,13 @@ if ($role === 'admin') {
         'revenue'         => "SELECT COALESCE(SUM(total_amount),0) AS c FROM orders",
     ];
 
+    // Pending seller applications — all PKs/FKs corrected
     $result = $conn->query("
-        SELECT sa.id AS app_id, sa.store_name, sa.reason, sa.created_at AS applied_at,
-               u.id AS user_id, u.first_name, u.last_name, u.email, u.username
+        SELECT sa.sellerApplicationId AS app_id, sa.store_name, sa.reason,
+               sa.created_at AS applied_at,
+               u.userId AS user_id, u.first_name, u.last_name, u.email, u.username
         FROM seller_applications sa
-        JOIN users u ON u.id = sa.user_id
+        JOIN users u ON u.userId = sa.userId
         WHERE sa.status = 'pending'
         ORDER BY sa.created_at ASC
     ");
@@ -299,19 +303,23 @@ if ($role === 'admin') {
         }
     }
 
-    // ── Admin orders + products ───────────────────────────
-    $adminOrders   = app_get_orders_for_seller(null);
-    $adminProducts = $conn->query("
-        SELECT p.id, p.name, b.name AS brand, c.name AS category,
+    // All orders
+    $adminOrders = app_get_orders_for_seller(null);
+
+    // All products — JOINs corrected
+    $result = $conn->query("
+        SELECT p.productId, p.name,
+               b.name AS brand,
+               c.name AS category,
                p.price, p.stock, p.is_active,
                COALESCE(u.store_name, u.username, 'Marketplace') AS seller_name
         FROM products p
-        LEFT JOIN brands b     ON b.id = p.brand_id
-        LEFT JOIN categories c ON c.id = p.category_id
-        LEFT JOIN users u      ON u.id = p.seller_id
+        LEFT JOIN brands     b ON b.brandId    = p.brandId
+        LEFT JOIN categories c ON c.categoryId = p.categoryId
+        LEFT JOIN users      u ON u.userId     = p.sellerUserId
         ORDER BY p.created_at DESC
     ");
-    $adminProducts = $adminProducts ? $adminProducts->fetch_all(MYSQLI_ASSOC) : [];
+    $adminProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
     foreach ($queries as $key => $sql) {
         $result = $conn->query($sql);
@@ -326,27 +334,35 @@ if ($role === 'admin') {
     }
 }
 
+// ── Seller data ───────────────────────────────────────────────────────────────
 if ($role === 'seller') {
-    $sellerId = (int) $user['id'];
-    $sellerStats['products']        = (int) ($conn->query("SELECT COUNT(*) AS c FROM products WHERE seller_id = {$sellerId}")->fetch_assoc()['c'] ?? 0);
-    $sellerStats['active_products'] = (int) ($conn->query("SELECT COUNT(*) AS c FROM products WHERE seller_id = {$sellerId} AND is_active = 1")->fetch_assoc()['c'] ?? 0);
-    $sellerStats['orders']          = (int) ($conn->query("SELECT COUNT(*) AS c FROM orders WHERE seller_id = {$sellerId}")->fetch_assoc()['c'] ?? 0);
-    $sellerStats['revenue']         = (float) ($conn->query("SELECT COALESCE(SUM(total_amount),0) AS c FROM orders WHERE seller_id = {$sellerId}")->fetch_assoc()['c'] ?? 0);
-    $sellerProducts = $conn->query("
-    SELECT p.id, p.name, b.name AS brand, c.name AS category,
-           p.description, p.price, p.stock, p.icon_class, p.is_active
-    FROM products p
-    LEFT JOIN brands b     ON b.id = p.brand_id
-    LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.seller_id = {$sellerId}
-    ORDER BY p.created_at DESC
-    ")->fetch_all(MYSQLI_ASSOC);
+    $sellerId = (int) $user['userId'];
+
+    $sellerStats['products']        = (int)   ($conn->query("SELECT COUNT(*) AS c FROM products WHERE sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
+    $sellerStats['active_products'] = (int)   ($conn->query("SELECT COUNT(*) AS c FROM products WHERE sellerUserId = {$sellerId} AND is_active = 1")->fetch_assoc()['c'] ?? 0);
+    $sellerStats['orders']          = (int)   ($conn->query("SELECT COUNT(*) AS c FROM orders WHERE sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
+    $sellerStats['revenue']         = (float) ($conn->query("SELECT COALESCE(SUM(total_amount),0) AS c FROM orders WHERE sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
+
+    $result = $conn->query("
+        SELECT p.productId, p.name,
+               b.name AS brand,
+               c.name AS category,
+               p.description, p.price, p.stock, p.icon_class, p.is_active
+        FROM products p
+        LEFT JOIN brands     b ON b.brandId    = p.brandId
+        LEFT JOIN categories c ON c.categoryId = p.categoryId
+        WHERE p.sellerUserId = {$sellerId}
+        ORDER BY p.created_at DESC
+    ");
+    $sellerProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+
     $sellerOrders = app_get_orders_for_seller($sellerId);
 }
 
-$adminOrdersByDay   = [];
-$adminStatusCounts  = ['placed' => 0, 'processing' => 0, 'completed' => 0, 'cancelled' => 0];
-$sellerRevenueByDay = [];
+// ── Chart data ────────────────────────────────────────────────────────────────
+$adminOrdersByDay     = [];
+$adminStatusCounts    = ['placed' => 0, 'processing' => 0, 'completed' => 0, 'cancelled' => 0];
+$sellerRevenueByDay   = [];
 $sellerCategoryCounts = [];
 
 for ($i = 6; $i >= 0; $i--) {
@@ -358,12 +374,14 @@ for ($i = 6; $i >= 0; $i--) {
 if ($role === 'admin') {
     $chartRows = $conn->query("
         SELECT DATE(created_at) AS order_day, COUNT(*) AS total
-        FROM orders WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        FROM orders
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
         GROUP BY DATE(created_at)
     ")->fetch_all(MYSQLI_ASSOC);
     foreach ($chartRows as $row) {
         $adminOrdersByDay[date('M d', strtotime($row['order_day']))] = (int) $row['total'];
     }
+
     $statusRows = $conn->query("SELECT status, COUNT(*) AS total FROM orders GROUP BY status")->fetch_all(MYSQLI_ASSOC);
     foreach ($statusRows as $row) {
         $adminStatusCounts[$row['status']] = (int) $row['total'];
@@ -371,28 +389,30 @@ if ($role === 'admin') {
 }
 
 if ($role === 'seller') {
-    $sellerId  = (int) $user['id'];
+    $sellerId  = (int) $user['userId'];
+
     $chartRows = $conn->query("
         SELECT DATE(created_at) AS order_day, COALESCE(SUM(total_amount),0) AS total
-        FROM orders WHERE seller_id = {$sellerId} AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        FROM orders
+        WHERE sellerUserId = {$sellerId}
+          AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
         GROUP BY DATE(created_at)
     ")->fetch_all(MYSQLI_ASSOC);
     foreach ($chartRows as $row) {
         $sellerRevenueByDay[date('M d', strtotime($row['order_day']))] = (float) $row['total'];
     }
+
     $categoryRows = $conn->query("
-    SELECT c.name AS category, COUNT(*) AS total 
-    FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.seller_id = {$sellerId} 
-    GROUP BY c.name
-        ")->fetch_all(MYSQLI_ASSOC);
+        SELECT c.name AS category, COUNT(*) AS total
+        FROM products p
+        LEFT JOIN categories c ON c.categoryId = p.categoryId
+        WHERE p.sellerUserId = {$sellerId}
+        GROUP BY c.name
+    ")->fetch_all(MYSQLI_ASSOC);
     foreach ($categoryRows as $row) {
         $sellerCategoryCounts[$row['category']] = (int) $row['total'];
     }
 }
-
-require_once __DIR__ . '/includes/modal.php';
 
 $pageTitle   = ucfirst($role) . ' Dashboard — ProTech';
 $pageCss     = ['admin.css', 'dashboard.css'];
@@ -464,6 +484,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                 <div class="flash <?= app_sanitize($flash['type']) ?>"><?= app_sanitize($flash['message']) ?></div>
             <?php endif; ?>
 
+            <!-- ══ ADMIN: DASHBOARD ══════════════════════════════════════════ -->
             <?php if ($role === 'admin' && $tab === 'dashboard'): ?>
                 <div class="row g-3 mb-4">
                     <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon green"><i class="fa-solid fa-users"></i></div><div class="stat-value"><?= $adminStats['users'] ?></div><div class="stat-label">Customers</div></div></div>
@@ -483,6 +504,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     <div class="col-xl-5"><div class="panel-card chart-card"><h4>Order Status Breakdown</h4><div class="chart-wrap"><canvas id="adminStatusChart"></canvas></div></div></div>
                 </div>
 
+            <!-- ══ ADMIN: SELLERS ════════════════════════════════════════════ -->
             <?php elseif ($role === 'admin' && $tab === 'sellers'): ?>
                 <div class="table-card">
                     <div class="table-card-header">
@@ -549,6 +571,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     </div>
                 </div>
 
+            <!-- ══ ADMIN: ORDERS ═════════════════════════════════════════════ -->
             <?php elseif ($role === 'admin' && $tab === 'orders'): ?>
                 <div class="table-card">
                     <div class="table-card-header"><h5>All Orders <span class="badge-count"><?= count($adminOrders) ?></span></h5></div>
@@ -561,7 +584,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                 <tbody>
                                 <?php foreach ($adminOrders as $order): ?>
                                     <tr>
-                                        <td>#<?= (int) $order['id'] ?></td>
+                                        <td>#<?= (int) $order['orderId'] ?></td>
                                         <td><?= app_sanitize($order['customer_name']) ?></td>
                                         <td><?= app_sanitize($order['seller_name']) ?></td>
                                         <td><?= (int) $order['item_count'] ?></td>
@@ -572,9 +595,9 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                             <button class="status-btn" type="button"
                                                 data-modal-target="#orderStatusModal"
                                                 data-modal-title="Update Order Status"
-                                                data-modal-message="Change the status for order #<?= (int) $order['id'] ?>."
+                                                data-modal-message="Change the status for order #<?= (int) $order['orderId'] ?>."
                                                 data-modal-confirm="Save Status"
-                                                data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['id'], 'status' => $order['status']])) ?>'>
+                                                data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>
                                                 Update
                                             </button>
                                         </td>
@@ -586,6 +609,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     </div>
                 </div>
 
+            <!-- ══ ADMIN: PRODUCTS ═══════════════════════════════════════════ -->
             <?php elseif ($role === 'admin' && $tab === 'products'): ?>
                 <div class="table-card">
                     <div class="table-card-header"><h5>All Products <span class="badge-count"><?= count($adminProducts) ?></span></h5></div>
@@ -598,7 +622,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                 <tbody>
                                 <?php foreach ($adminProducts as $product): ?>
                                     <tr>
-                                        <td>#<?= (int) $product['id'] ?></td>
+                                        <td>#<?= (int) $product['productId'] ?></td>
                                         <td><?= app_sanitize($product['name']) ?></td>
                                         <td><?= app_sanitize($product['seller_name']) ?></td>
                                         <td><?= app_sanitize($product['brand']) ?></td>
@@ -614,9 +638,11 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     </div>
                 </div>
 
+            <!-- ══ ADMIN: GENERAL ════════════════════════════════════════════ -->
             <?php elseif ($role === 'admin'): ?>
                 <div class="panel-card"><h4>General</h4><p class="mb-0">Admin account tools can be extended here.</p></div>
 
+            <!-- ══ SELLER: DASHBOARD ════════════════════════════════════════ -->
             <?php elseif ($role === 'seller' && $tab === 'dashboard'): ?>
                 <div class="row g-3 mb-4">
                     <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon orange"><i class="fa-solid fa-box"></i></div><div class="stat-value"><?= $sellerStats['products'] ?></div><div class="stat-label">Store Products</div></div></div>
@@ -629,6 +655,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     <div class="col-xl-5"><div class="panel-card chart-card"><h4>Product Category Mix</h4><div class="chart-wrap"><canvas id="sellerCategoryChart"></canvas></div></div></div>
                 </div>
 
+            <!-- ══ SELLER: PRODUCTS ═════════════════════════════════════════ -->
             <?php elseif ($role === 'seller' && $tab === 'products'): ?>
                 <div class="table-card">
                     <div class="table-card-header">
@@ -651,7 +678,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                 <tbody>
                                 <?php foreach ($sellerProducts as $product): ?>
                                     <tr>
-                                        <td>#<?= (int) $product['id'] ?></td>
+                                        <td>#<?= (int) $product['productId'] ?></td>
                                         <td><?= app_sanitize($product['name']) ?></td>
                                         <td><?= app_sanitize($product['brand']) ?></td>
                                         <td><?= app_sanitize($product['category']) ?></td>
@@ -664,7 +691,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                                 data-modal-title="Edit Product"
                                                 data-modal-message="Update this product."
                                                 data-modal-confirm="Save Product"
-                                                data-modal-payload='<?= app_sanitize(json_encode(['action' => 'save_product', 'product_id' => (int) $product['id'], 'name' => $product['name'], 'brand' => $product['brand'], 'category' => $product['category'], 'description' => $product['description'], 'price' => $product['price'], 'stock' => (int) $product['stock'], 'icon_class' => $product['icon_class'], 'is_active' => (int) $product['is_active']])) ?>'>
+                                                data-modal-payload='<?= app_sanitize(json_encode(['action' => 'save_product', 'product_id' => (int) $product['productId'], 'name' => $product['name'], 'brand' => $product['brand'], 'category' => $product['category'], 'description' => $product['description'], 'price' => $product['price'], 'stock' => (int) $product['stock'], 'icon_class' => $product['icon_class'], 'is_active' => (int) $product['is_active']])) ?>'>
                                                 Edit
                                             </button>
                                         </td>
@@ -676,6 +703,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     </div>
                 </div>
 
+            <!-- ══ SELLER: ORDERS ════════════════════════════════════════════ -->
             <?php elseif ($role === 'seller' && $tab === 'orders'): ?>
                 <div class="table-card">
                     <div class="table-card-header"><h5>Store Orders <span class="badge-count"><?= count($sellerOrders) ?></span></h5></div>
@@ -688,7 +716,7 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                 <tbody>
                                 <?php foreach ($sellerOrders as $order): ?>
                                     <tr>
-                                        <td>#<?= (int) $order['id'] ?></td>
+                                        <td>#<?= (int) $order['orderId'] ?></td>
                                         <td><?= app_sanitize($order['customer_name']) ?></td>
                                         <td><?= (int) $order['item_count'] ?></td>
                                         <td>$<?= number_format((float) $order['total_amount'], 2) ?></td>
@@ -698,9 +726,9 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                                             <button class="status-btn" type="button"
                                                 data-modal-target="#orderStatusModal"
                                                 data-modal-title="Update Order Status"
-                                                data-modal-message="Change the status for order #<?= (int) $order['id'] ?>."
+                                                data-modal-message="Change the status for order #<?= (int) $order['orderId'] ?>."
                                                 data-modal-confirm="Save Status"
-                                                data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['id'], 'status' => $order['status']])) ?>'>
+                                                data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>
                                                 Update
                                             </button>
                                         </td>
@@ -712,12 +740,14 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
                     </div>
                 </div>
 
+            <!-- ══ SELLER: ANALYTICS ════════════════════════════════════════ -->
             <?php elseif ($role === 'seller' && $tab === 'analytics'): ?>
                 <div class="row g-4">
                     <div class="col-xl-7"><div class="panel-card chart-card"><h4>Revenue Trend</h4><div class="chart-wrap"><canvas id="sellerRevenueChartAnalytics"></canvas></div></div></div>
                     <div class="col-xl-5"><div class="panel-card chart-card"><h4>Category Mix</h4><div class="chart-wrap"><canvas id="sellerCategoryChartAnalytics"></canvas></div></div></div>
                 </div>
 
+            <!-- ══ FALLBACK ══════════════════════════════════════════════════ -->
             <?php else: ?>
                 <div class="panel-card"><h4><?= app_sanitize($allowedTabs[$tab][0]) ?></h4><p class="mb-0">This section is ready for additional tools.</p></div>
             <?php endif; ?>
@@ -727,9 +757,9 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
 
 <!-- Modals -->
 <?php render_system_modal('sellerActionModal', 'Confirm Seller Action', 'Review this action before continuing.', 'Confirm'); ?>
-<?php render_system_modal('rejectSellerModal', 'Reject Application', 'Provide a reason for rejection (optional).', 'Reject Application'); ?>
-<?php render_system_modal('productModal',      'Save Product',         'Create or update a product listing.',     'Save Product'); ?>
-<?php render_system_modal('orderStatusModal',  'Update Order Status',  'Update the status for this order.',       'Save Status'); ?>
+<?php render_system_modal('rejectSellerModal', 'Reject Application',    'Provide a reason for rejection (optional).', 'Reject Application'); ?>
+<?php render_system_modal('productModal',      'Save Product',          'Create or update a product listing.',        'Save Product'); ?>
+<?php render_system_modal('orderStatusModal',  'Update Order Status',   'Update the status for this order.',          'Save Status'); ?>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -744,10 +774,10 @@ document.getElementById('sidebarToggle')?.addEventListener('click', () => {
 
 [
     ['#sellerRequestsTable', [[5, 'asc']], [6, 7], 'Search applications...'],
-    ['#sellerProductsTable', [[0, 'desc']], [7],    'Search products...'],
-    ['#adminOrdersTable',    [[6, 'desc']], [7],    'Search orders...'],
-    ['#sellerOrdersTable',   [[5, 'desc']], [6],    'Search orders...'],
-    ['#productsTable',       [[0, 'desc']], [],     'Search all products...'],
+    ['#sellerProductsTable', [[0, 'desc']], [7],   'Search products...'],
+    ['#adminOrdersTable',    [[6, 'desc']], [7],   'Search orders...'],
+    ['#sellerOrdersTable',   [[5, 'desc']], [6],   'Search orders...'],
+    ['#productsTable',       [[0, 'desc']], [],    'Search all products...'],
 ].forEach(([selector, order, disabledTargets, placeholder]) => {
     if (!document.querySelector(selector)) return;
     $(selector).DataTable({
@@ -760,7 +790,6 @@ document.getElementById('sidebarToggle')?.addEventListener('click', () => {
 });
 
 function mountModalForms() {
-    // Seller approve modal — just hidden inputs, no extra fields
     const sellerModal = document.getElementById('sellerActionModal');
     if (sellerModal) {
         sellerModal.querySelector('.app-modal__slot').innerHTML = `
@@ -771,7 +800,6 @@ function mountModalForms() {
         `;
     }
 
-    // Reject modal — includes optional rejection reason textarea
     const rejectModal = document.getElementById('rejectSellerModal');
     if (rejectModal) {
         rejectModal.querySelector('.app-modal__slot').innerHTML = `
@@ -786,7 +814,6 @@ function mountModalForms() {
         `;
     }
 
-    // Product modal
     const productModal = document.getElementById('productModal');
     if (productModal) {
         productModal.querySelector('.app-modal__slot').innerHTML = `
@@ -821,7 +848,6 @@ function mountModalForms() {
         `;
     }
 
-    // Order status modal
     const orderModal = document.getElementById('orderStatusModal');
     if (orderModal) {
         orderModal.querySelector('.app-modal__slot').innerHTML = `
@@ -843,15 +869,14 @@ function mountModalForms() {
 
 mountModalForms();
 
-// Chart data from PHP
-const adminOrdersLabels  = <?= json_encode(array_keys($adminOrdersByDay)) ?>;
-const adminOrdersData    = <?= json_encode(array_values($adminOrdersByDay)) ?>;
-const adminStatusLabels  = <?= json_encode(array_map('ucfirst', array_keys($adminStatusCounts))) ?>;
-const adminStatusData    = <?= json_encode(array_values($adminStatusCounts)) ?>;
-const sellerRevenueLabels = <?= json_encode(array_keys($sellerRevenueByDay)) ?>;
-const sellerRevenueData   = <?= json_encode(array_values($sellerRevenueByDay)) ?>;
-const sellerCategoryLabels = <?= json_encode(array_keys($sellerCategoryCounts)) ?>;
-const sellerCategoryData   = <?= json_encode(array_values($sellerCategoryCounts)) ?>;
+const adminOrdersLabels      = <?= json_encode(array_keys($adminOrdersByDay)) ?>;
+const adminOrdersData        = <?= json_encode(array_values($adminOrdersByDay)) ?>;
+const adminStatusLabels      = <?= json_encode(array_map('ucfirst', array_keys($adminStatusCounts))) ?>;
+const adminStatusData        = <?= json_encode(array_values($adminStatusCounts)) ?>;
+const sellerRevenueLabels    = <?= json_encode(array_keys($sellerRevenueByDay)) ?>;
+const sellerRevenueData      = <?= json_encode(array_values($sellerRevenueByDay)) ?>;
+const sellerCategoryLabels   = <?= json_encode(array_keys($sellerCategoryCounts)) ?>;
+const sellerCategoryData     = <?= json_encode(array_values($sellerCategoryCounts)) ?>;
 
 function makeLineChart(id, labels, data, label, color) {
     const el = document.getElementById(id);
@@ -873,11 +898,11 @@ function makeDoughnutChart(id, labels, data) {
     });
 }
 
-makeLineChart('adminOrdersChart',            adminOrdersLabels,    adminOrdersData,    'Orders',  'rgba(255,115,21,1)');
-makeDoughnutChart('adminStatusChart',        adminStatusLabels,    adminStatusData);
-makeLineChart('sellerRevenueChart',          sellerRevenueLabels,  sellerRevenueData,  'Revenue', 'rgba(16,185,129,1)');
-makeLineChart('sellerRevenueChartAnalytics', sellerRevenueLabels,  sellerRevenueData,  'Revenue', 'rgba(16,185,129,1)');
-makeDoughnutChart('sellerCategoryChart',     sellerCategoryLabels, sellerCategoryData);
+makeLineChart('adminOrdersChart',             adminOrdersLabels,    adminOrdersData,   'Orders',  'rgba(255,115,21,1)');
+makeDoughnutChart('adminStatusChart',         adminStatusLabels,    adminStatusData);
+makeLineChart('sellerRevenueChart',           sellerRevenueLabels,  sellerRevenueData, 'Revenue', 'rgba(16,185,129,1)');
+makeLineChart('sellerRevenueChartAnalytics',  sellerRevenueLabels,  sellerRevenueData, 'Revenue', 'rgba(16,185,129,1)');
+makeDoughnutChart('sellerCategoryChart',      sellerCategoryLabels, sellerCategoryData);
 makeDoughnutChart('sellerCategoryChartAnalytics', sellerCategoryLabels, sellerCategoryData);
 </script>
 </body>
