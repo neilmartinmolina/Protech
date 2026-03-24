@@ -50,7 +50,6 @@
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         serverMsg.className = '';
-        serverMsg.style.display = 'none';
 
         const email  = emailInput.value.trim();
         const errEl  = document.getElementById('emailError');

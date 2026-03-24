@@ -16,7 +16,7 @@ if (!$conn->connect_error) {
     $conn->set_charset('utf8mb4');
     $now  = date('Y-m-d H:i:s');
     $stmt = $conn->prepare('
-        SELECT id FROM password_resets
+        SELECT passwordResetId FROM password_resets
         WHERE token = ? AND expires_at > ? AND used_at IS NULL
         LIMIT 1
     ');
@@ -101,7 +101,7 @@ $pageScripts = ['js/reset_password.js'];
             <div style="text-align:center;padding:1rem 0;">
                 <i class="fa-solid fa-triangle-exclamation" style="font-size:2.5rem;color:#ef4444;margin-bottom:1rem;display:block;"></i>
                 <p style="color:var(--text-muted);margin-bottom:1.5rem;">Request a new link and try again.</p>
-                <a href="forgot-password.php" class="btn-rp" style="display:block;text-decoration:none;text-align:center;">
+                <a href="forgotpassword.php" class="btn-rp" style="display:block;text-decoration:none;text-align:center;">
                     Request New Link
                 </a>
             </div>

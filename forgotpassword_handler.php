@@ -9,15 +9,9 @@ require_once __DIR__ . '/config.php';
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require 'phpmailer/Exception.php';
-require 'phpmailer/PHPMailer.php';
-require 'phpmailer/SMTP.php';
-
-define('SMTP_HOST',   'smtp.gmail.com');
-define('SMTP_PORT',   587);
-define('SMTP_USER',   'neilmartinmolina@gmail.com');
-define('SMTP_PASS',   'yyio jctx phof utie');
-define('FROM_NAME',   'Protech');
+require_once __DIR__ . '/phpmailer/Exception.php';
+require_once __DIR__ . '/phpmailer/PHPMailer.php';
+require_once __DIR__ . '/phpmailer/SMTP.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -36,21 +30,7 @@ if ($conn->connect_error) {
 }
 $conn->set_charset('utf8mb4');
 
-// ── Ensure password_resets table exists ───────────────────────────────────────
-$conn->query("
-    CREATE TABLE IF NOT EXISTS password_resets (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        user_id INT UNSIGNED NOT NULL,
-        token CHAR(64) NOT NULL,
-        expires_at DATETIME NOT NULL,
-        used_at DATETIME DEFAULT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_token (token),
-        KEY idx_user (user_id),
-        KEY idx_expires (expires_at),
-        CONSTRAINT fk_pr_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-");
+// password_resets table: passwordResetId, userId, token, expires_at, used_at, created_at
 
 // ═════════════════════════════════════════════════════════════════════════════
 // ACTION: request — send reset email
@@ -67,7 +47,7 @@ if ($action === 'request') {
 
     // Look up user — always return a generic success message to prevent
     // email enumeration (don't tell attacker whether email exists)
-    $stmt = $conn->prepare('SELECT id, first_name, last_name FROM users WHERE email = ? LIMIT 1');
+    $stmt = $conn->prepare('SELECT userId, first_name, last_name FROM users WHERE email = ? LIMIT 1');
     $stmt->bind_param('s', $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -112,7 +92,7 @@ if ($action === 'request') {
     $token     = bin2hex(random_bytes(32));
     $expiresAt = date('Y-m-d H:i:s', time() + 3600);
 
-    $stmtT = $conn->prepare('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)');
+    $stmtT = $conn->prepare('INSERT INTO password_resets (userId, token, expires_at) VALUES (?, ?, ?)');
     $stmtT->bind_param('iss', $user['userId'], $token, $expiresAt);
     $stmtT->execute();
     $stmtT->close();
@@ -199,7 +179,7 @@ if ($action === 'reset') {
     // ── Look up token ─────────────────────────────────────────────────────────
     $now  = date('Y-m-d H:i:s');
     $stmt = $conn->prepare('
-        SELECT pr.id, pr.user_id
+        SELECT pr.passwordResetId, pr.userId
         FROM password_resets pr
         WHERE pr.token = ?
           AND pr.expires_at > ?
@@ -220,14 +200,14 @@ if ($action === 'reset') {
 
     // ── Update password ───────────────────────────────────────────────────────
     $newHash = password_hash($password, PASSWORD_BCRYPT);
-    $stmtU   = $conn->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
-    $stmtU->bind_param('si', $newHash, $reset['user_id']);
+    $stmtU   = $conn->prepare('UPDATE users SET password_hash = ? WHERE userId = ?');
+    $stmtU->bind_param('si', $newHash, $reset['userId']);
     $stmtU->execute();
     $stmtU->close();
 
     // ── Mark token as used ────────────────────────────────────────────────────
-    $stmtM = $conn->prepare('UPDATE password_resets SET used_at = NOW() WHERE id = ?');
-    $stmtM->bind_param('i', $reset['id']);
+    $stmtM = $conn->prepare('UPDATE password_resets SET used_at = NOW() WHERE passwordResetId = ?');
+    $stmtM->bind_param('i', $reset['passwordResetId']);
     $stmtM->execute();
     $stmtM->close();
 

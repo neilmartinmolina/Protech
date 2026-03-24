@@ -19,7 +19,7 @@ if ($productId <= 0) {
 }
 
 $conn = app_db();
-$stmt = $conn->prepare('SELECT id, stock FROM products WHERE id = ? AND is_active = 1 LIMIT 1');
+$stmt = $conn->prepare('SELECT productId, stock FROM products WHERE productId = ? AND is_active = 1 LIMIT 1');
 $stmt->bind_param('i', $productId);
 $stmt->execute();
 $product = $stmt->get_result()->fetch_assoc();
