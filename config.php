@@ -31,3 +31,4 @@ foreach ($keys as $key) {
         putenv($key . '=' . $value);
     }
 }
+

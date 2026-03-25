@@ -155,12 +155,22 @@ $priceRanges = [
             const res  = await fetch('cart_action.php', { method: 'POST', body: payload });
             const data = await res.json();
             if (!data.success) {
-                alert(data.message || 'Unable to add item to cart.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Could not add to cart',
+                    text: data.message || 'Unable to add item to cart.',
+                    confirmButtonText: 'OK'
+                });
                 return;
             }
             window.location.href = 'cart.php';
         } catch {
-            alert('Something went wrong. Please try again.');
+            Swal.fire({
+                icon: 'error',
+                title: 'Request failed',
+                text: 'Something went wrong. Please try again.',
+                confirmButtonText: 'OK'
+            });
         }
     }
 

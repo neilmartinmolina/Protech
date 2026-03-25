@@ -97,11 +97,6 @@
     });
 
     // ── Helpers ─────────────────────────────────────────────────────────────
-    function showMessage(text, type) {
-        serverMsg.textContent = text;
-        serverMsg.className   = type === 'success' ? 'msg-success' : 'msg-error';
-    }
-
     function setLoading(loading) {
         submitBtn.disabled       = loading;
         btnText.style.display    = loading ? 'none' : 'inline';
@@ -143,18 +138,31 @@
             const res  = await fetch('forgotpassword_handler.php', { method: 'POST', body: payload });
             const data = await res.json();
 
-            showMessage(data.message, data.success ? 'success' : 'error');
-
             if (data.success) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Password updated',
+                    text: data.message || 'Your password has been reset successfully.',
+                    confirmButtonText: 'Continue'
+                });
                 form.style.display = 'none';
-                setTimeout(() => {
-                    window.location.href = data.redirect || 'login.php';
-                }, 1500);
+                window.location.href = data.redirect || 'login.php';
             } else {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Reset failed',
+                    text: data.message || 'Unable to reset password.',
+                    confirmButtonText: 'OK'
+                });
                 setLoading(false);
             }
         } catch (err) {
-            showMessage('Something went wrong. Please try again.', 'error');
+            await Swal.fire({
+                icon: 'error',
+                title: 'Request failed',
+                text: 'Something went wrong. Please try again.',
+                confirmButtonText: 'OK'
+            });
             setLoading(false);
         }
     });

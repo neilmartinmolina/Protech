@@ -480,10 +480,6 @@ $pageCssExt  = ['https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min
         </div>
 
         <div class="admin-content">
-            <?php if ($flash): ?>
-                <div class="flash <?= app_sanitize($flash['type']) ?>"><?= app_sanitize($flash['message']) ?></div>
-            <?php endif; ?>
-
             <!-- ══ ADMIN: DASHBOARD ══════════════════════════════════════════ -->
             <?php if ($role === 'admin' && $tab === 'dashboard'): ?>
                 <div class="row g-3 mb-4">
@@ -904,6 +900,29 @@ makeLineChart('sellerRevenueChart',           sellerRevenueLabels,  sellerRevenu
 makeLineChart('sellerRevenueChartAnalytics',  sellerRevenueLabels,  sellerRevenueData, 'Revenue', 'rgba(16,185,129,1)');
 makeDoughnutChart('sellerCategoryChart',      sellerCategoryLabels, sellerCategoryData);
 makeDoughnutChart('sellerCategoryChartAnalytics', sellerCategoryLabels, sellerCategoryData);
+
+const flash = <?= json_encode($flash, JSON_UNESCAPED_UNICODE) ?>;
+if (flash && flash.message && typeof Toastify === 'function') {
+    const type = flash.type || 'info';
+    const bgByType = {
+        success: 'linear-gradient(to right, #10b981, #059669)',
+        warning: 'linear-gradient(to right, #f59e0b, #d97706)',
+        danger:  'linear-gradient(to right, #ef4444, #dc2626)',
+        info:    'linear-gradient(to right, #3b82f6, #2563eb)',
+    };
+    Toastify({
+        text: flash.message,
+        duration: 4500,
+        gravity: 'top',
+        position: 'right',
+        close: true,
+        stopOnFocus: true,
+        style: {
+            background: bgByType[type] || bgByType.info,
+            borderRadius: '10px',
+        },
+    }).showToast();
+}
 </script>
 </body>
 </html>

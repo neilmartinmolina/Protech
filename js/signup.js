@@ -180,7 +180,12 @@
         }
 
         if (data.success) {
-            showMessage(data.message, 'success');
+            await Swal.fire({
+                icon: 'success',
+                title: 'Account created',
+                text: data.message || 'Your account has been created successfully.',
+                confirmButtonText: 'Great'
+            });
             form.reset();
             form.querySelectorAll('.form-control').forEach(clearState);
             strengthBar.style.width   = '0%';
@@ -188,7 +193,12 @@
             submitBtn.textContent     = 'Account Created!';
         } else {
             const msg = data.errors ? data.errors.join(' ') : (data.message || 'Something went wrong.');
-            showMessage(msg, 'error');
+            await Swal.fire({
+                icon: 'error',
+                title: 'Signup failed',
+                text: msg,
+                confirmButtonText: 'OK'
+            });
             submitBtn.disabled    = false;
             submitBtn.textContent = 'Create Account';
         }

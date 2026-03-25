@@ -4,6 +4,8 @@ $basePath = ($basePath === '' || $basePath === '/' || $basePath === '\\') ? '' :
 $basePath = $basePath ?: '';
 ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <script src="<?= htmlspecialchars($basePath ? $basePath . '/' : ''); ?>js/modal.js"></script>
 <?php
 if (!empty($pageScripts) && is_array($pageScripts)) {

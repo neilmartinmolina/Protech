@@ -81,7 +81,7 @@ $subtotal = app_cart_total();
                         <?php if (app_current_user()): ?>
                             <form method="post">
                                 <input type="hidden" name="action" value="checkout">
-                                <button class="action-btn primary w-100" type="submit">Checkout Now</button>
+                                <button class="action-btn primary w-100" type="submit" id="checkoutBtn">Checkout Now</button>
                             </form>
                         <?php else: ?>
                             <a href="login.php" class="action-btn primary w-100 d-inline-flex justify-content-center text-decoration-none">Sign In to Checkout</a>
@@ -105,7 +105,12 @@ $subtotal = app_cart_total();
         const res = await fetch('cart_action.php', { method: 'POST', body: payload });
         const data = await res.json();
         if (!data.success) {
-            alert(data.message || 'Unable to update cart.');
+            Swal.fire({
+                icon: 'error',
+                title: 'Cart update failed',
+                text: data.message || 'Unable to update cart.',
+                confirmButtonText: 'OK'
+            });
             return;
         }
         window.location.reload();
@@ -116,6 +121,20 @@ $subtotal = app_cart_total();
         const qtyInput = item.querySelector('.item-qty');
         item.querySelector('.update-item')?.addEventListener('click', () => cartAction('update', productId, qtyInput.value));
         item.querySelector('.remove-item')?.addEventListener('click', () => cartAction('remove', productId, 1));
+    });
+
+    document.getElementById('checkoutBtn')?.addEventListener('click', async event => {
+        event.preventDefault();
+        const form = event.currentTarget.closest('form');
+        const result = await Swal.fire({
+            icon: 'question',
+            title: 'Place order now?',
+            text: 'This will place your current cart as order(s).',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, place order',
+            cancelButtonText: 'Cancel'
+        });
+        if (result.isConfirmed) form?.submit();
     });
 })();
 </script>

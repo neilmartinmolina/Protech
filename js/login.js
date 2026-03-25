@@ -46,12 +46,6 @@
         if (msgEl) msgEl.classList.remove('d-block');
     }
 
-    function showServerMessage(text, type) {
-        serverMsg.textContent = text;
-        serverMsg.className   = type === 'success' ? 'msg-success' : 'msg-error';
-        serverMsg.style.display = 'block';
-    }
-
     function hideServerMessage() {
         serverMsg.style.display = 'none';
         serverMsg.className     = '';
@@ -133,16 +127,29 @@
             const data = await res.json();
 
             if (data.success) {
-                showServerMessage(data.message || 'Login successful! Redirecting…', 'success');
-                setTimeout(() => {
-                    window.location.href = data.redirect || 'index.php';
-                }, 800);
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Login successful',
+                    text: data.message || 'Redirecting to your account...',
+                    confirmButtonText: 'Continue'
+                });
+                window.location.href = data.redirect || 'index.php';
             } else {
-                showServerMessage(data.message || 'Invalid credentials. Please try again.', 'error');
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Login failed',
+                    text: data.message || 'Invalid credentials. Please try again.',
+                    confirmButtonText: 'OK'
+                });
                 setLoading(false);
             }
         } catch (err) {
-            showServerMessage('Something went wrong. Please try again.', 'error');
+            await Swal.fire({
+                icon: 'error',
+                title: 'Request failed',
+                text: 'Something went wrong. Please try again.',
+                confirmButtonText: 'OK'
+            });
             setLoading(false);
         }
     });
