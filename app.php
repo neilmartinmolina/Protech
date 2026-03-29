@@ -824,7 +824,7 @@ function app_upsert_product(array $user, array $data): array
         $stmt->execute();
         $stmt->close();
 
-        return ['success' => true, 'message' => 'Product updated successfully.'];
+        return ['success' => true, 'message' => 'Product updated successfully.', 'product_id' => $productId];
     }
 
     $stmt = $conn->prepare("
@@ -833,7 +833,8 @@ function app_upsert_product(array $user, array $data): array
     ");
     $stmt->bind_param('isiisdisi', $sellerId, $name, $brandId, $categoryId, $description, $price, $stock, $iconClass, $isActive);
     $stmt->execute();
+    $newId = (int) $conn->insert_id;
     $stmt->close();
 
-    return ['success' => true, 'message' => 'Product created successfully.'];
+    return ['success' => true, 'message' => 'Product created successfully.', 'product_id' => $newId];
 }

@@ -75,3 +75,38 @@
         position: static;
     }
 }
+
+/* Cover image on product cards */
+.product-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: inherit;
+}
+
+/* Clear filters button (sidebar) */
+.filter-clear-btn {
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+
+/* Empty state when no products match */
+.product-empty-state {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.product-empty-state__icon {
+    font-size: 2rem;
+    opacity: 0.4;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.product-empty-state__link {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
