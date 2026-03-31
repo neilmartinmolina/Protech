@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/app.php';
+$conn = app_db();
 
 $token  = trim($_GET['token'] ?? '');
 $status = 'invalid';
@@ -10,9 +11,9 @@ if (!empty($token)) {
     if (!$conn->connect_error) {
         $conn->set_charset('utf8mb4');
         $stmt = $conn->prepare('
-            SELECT vt.user_id, vt.expires_at, u.first_name
+            SELECT vt.userId, vt.expires_at, u.first_name
             FROM verification_tokens vt
-            JOIN users u ON u.id = vt.user_id
+            JOIN users u ON u.userId = vt.userId
             WHERE vt.token = ?
         ');
         $stmt->bind_param('s', $token);
@@ -29,8 +30,8 @@ if (!empty($token)) {
                 $del->close();
                 $status = 'expired';
             } else {
-                $userId = (int) $row['user_id'];
-                $upd = $conn->prepare('UPDATE users SET is_verified = 1 WHERE id = ?');
+                $userId = (int) $row['userId'];
+                $upd = $conn->prepare('UPDATE users SET is_verified = 1 WHERE userId = ?');
                 $upd->bind_param('i', $userId);
                 $upd->execute();
                 $upd->close();
@@ -42,7 +43,7 @@ if (!empty($token)) {
                 $status = 'success';
             }
         }
-        $conn->close();
+
     }
 }
 

@@ -10,7 +10,7 @@
         <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon orange"><i class="fa-solid fa-box"></i></div><div class="stat-value"><?= $sellerStats['products'] ?></div><div class="stat-label">Store Products</div></div></div>
         <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon green"><i class="fa-solid fa-box-open"></i></div><div class="stat-value"><?= $sellerStats['active_products'] ?></div><div class="stat-label">Active Products</div></div></div>
         <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon blue"><i class="fa-solid fa-receipt"></i></div><div class="stat-value"><?= $sellerStats['orders'] ?></div><div class="stat-label">Orders</div></div></div>
-        <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon red"><i class="fa-solid fa-dollar-sign"></i></div><div class="stat-value">$<?= number_format($sellerStats['revenue'], 2) ?></div><div class="stat-label">Revenue</div></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon red"><i class="fa-solid fa-dollar-sign"></i></div><div class="stat-value">₱<?= number_format($sellerStats['revenue'], 2) ?></div><div class="stat-label">Revenue</div></div></div>
     </div>
     <div class="row g-4">
         <div class="col-xl-7"><div class="panel-card chart-card"><h4>Revenue in the Last 7 Days</h4><div class="chart-wrap"><canvas id="sellerRevenueChart"></canvas></div></div></div>
@@ -43,7 +43,7 @@
                             <td><?= app_sanitize($product['name']) ?></td>
                             <td><?= app_sanitize($product['brand']) ?></td>
                             <td><?= app_sanitize($product['category']) ?></td>
-                            <td>$<?= number_format((float) $product['price'], 2) ?></td>
+                            <td>₱<?= number_format((float) $product['price'], 2) ?></td>
                             <td><?= (int) $product['stock'] ?></td>
                             <td><span class="pill <?= (int) $product['is_active'] ? 'completed' : 'cancelled' ?>"><?= (int) $product['is_active'] ? 'Active' : 'Inactive' ?></span></td>
                             <td>
@@ -79,7 +79,7 @@
                             <td>#<?= (int) $order['orderId'] ?></td>
                             <td><?= app_sanitize($order['customer_name']) ?></td>
                             <td><?= (int) $order['item_count'] ?></td>
-                            <td>$<?= number_format((float) $order['total_amount'], 2) ?></td>
+                            <td>₱<?= number_format((float) $order['total_amount'], 2) ?></td>
                             <td><span class="pill <?= app_sanitize($order['status']) ?>"><?= app_sanitize(ucfirst($order['status'])) ?></span></td>
                             <td><?= app_sanitize($order['created_at']) ?></td>
                             <td>

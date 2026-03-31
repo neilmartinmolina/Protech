@@ -346,7 +346,7 @@ $pageCss   = ['my_profile.css'];
                                             <div class="detail-item d-flex justify-content-between align-items-start flex-wrap gap-2">
                                                 <div>
                                                     <small>Order #<?= (int) $order['orderId'] ?> &bull; <?= app_sanitize($order['created_at']) ?></small>
-                                                    <strong class="d-block mt-1">$<?= number_format((float) $order['total_amount'], 2) ?></strong>
+                                                    <strong class="d-block mt-1">₱<?= number_format((float) $order['total_amount'], 2) ?></strong>
                                                     <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
                                                 </div>
                                                 <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
@@ -377,7 +377,7 @@ $pageCss   = ['my_profile.css'];
                                             <div class="detail-item d-flex justify-content-between align-items-start flex-wrap gap-2">
                                                 <div>
                                                     <small>Order #<?= (int) $order['orderId'] ?> &bull; <?= app_sanitize($order['created_at']) ?></small>
-                                                    <strong class="d-block mt-1">$<?= number_format((float) $order['total_amount'], 2) ?></strong>
+                                                    <strong class="d-block mt-1">₱<?= number_format((float) $order['total_amount'], 2) ?></strong>
                                                     <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
                                                 </div>
                                                 <button

@@ -9,13 +9,15 @@ $conn      = app_db();
 $filterBrands = array_values(array_filter(array_map('trim', explode(',', $_GET['brands'] ?? ''))));
 $filterPrices = array_values(array_filter(array_map('trim', explode(',', $_GET['prices'] ?? ''))));
 $filterSearch = trim($_GET['q'] ?? '');
+$currentPage  = max(1, (int) ($_GET['page'] ?? 1));
+$perPage      = 12;
 
 // ── Price range definitions ───────────────────────────────────────────────────
 $priceRanges = [
-    'under-100'   => ['label' => 'Under $100',    'min' => 0,       'max' => 99.99],
-    '100-500'     => ['label' => '$100 – $500',   'min' => 100,     'max' => 500],
-    '500-1000'    => ['label' => '$500 – $1,000', 'min' => 500,     'max' => 1000],
-    'above-1000'  => ['label' => 'Above $1,000',  'min' => 1000.01, 'max' => PHP_INT_MAX],
+    'under-100'   => ['label' => 'Under ₱100',    'min' => 0,        'max' => 99.99],
+    '100-500'     => ['label' => '₱100 – ₱500',   'min' => 100,      'max' => 500],
+    '500-1000'    => ['label' => '₱500 – ₱1,000', 'min' => 500,      'max' => 1000],
+    'above-1000'  => ['label' => 'Above ₱1,000',  'min' => 1000.01,  'max' => PHP_INT_MAX],
 ];
 
 // ── Build WHERE clause ────────────────────────────────────────────────────────
@@ -59,7 +61,34 @@ if ($filterPrices) {
 
 $whereSQL = 'WHERE ' . implode(' AND ', $where);
 
-// ── Fetch all matching products (no pagination) ─────────────────────────────
+// ── Count matching products for pagination ───────────────────────────────────
+$countSQL = "
+    SELECT COUNT(*) AS total
+    FROM products p
+    LEFT JOIN brands     b ON b.brandId    = p.brandId
+    LEFT JOIN categories c ON c.categoryId = p.categoryId
+    {$whereSQL}
+";
+
+$totalProducts = 0;
+$countStmt     = $conn->prepare($countSQL);
+if ($countStmt === false) {
+    error_log('product.php count prepare failed: ' . $conn->error);
+} else {
+    if ($params) {
+        $countStmt->bind_param($types, ...$params);
+    }
+    $countStmt->execute();
+    $countRow      = $countStmt->get_result()->fetch_assoc();
+    $totalProducts = (int) ($countRow['total'] ?? 0);
+    $countStmt->close();
+}
+
+$totalPages  = max(1, (int) ceil($totalProducts / $perPage));
+$currentPage = min($currentPage, $totalPages);
+$offset      = ($currentPage - 1) * $perPage;
+
+// ── Fetch matching products for current page ─────────────────────────────────
 $productSQL = "
     SELECT
         p.productId,
@@ -88,22 +117,24 @@ $productSQL = "
     ) cover ON cover.productId = p.productId
     {$whereSQL}
     ORDER BY p.created_at DESC, p.productId DESC
+    LIMIT ? OFFSET ?
 ";
 
-$products = [];
-$stmt     = $conn->prepare($productSQL);
+$products          = [];
+$productBindParams = $params;
+$productTypes      = $types . 'ii';
+$productBindParams[] = $perPage;
+$productBindParams[] = $offset;
+
+$stmt = $conn->prepare($productSQL);
 if ($stmt === false) {
-    error_log('product.php prepare failed: ' . $conn->error);
+    error_log('product.php list prepare failed: ' . $conn->error);
 } else {
-    if ($params) {
-        $stmt->bind_param($types, ...$params);
-    }
+    $stmt->bind_param($productTypes, ...$productBindParams);
     $stmt->execute();
     $products = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 }
-
-$totalProducts = count($products);
 
 // ── Brands from DB (for sidebar filter) ──────────────────────────────────────
 $brandRows = $conn->query('SELECT brandId, name FROM brands ORDER BY name ASC');
@@ -137,15 +168,25 @@ $jsBase = $jsBase ?: '';
 
                 <div class="filter-group">
                     <h5>Product Brand</h5>
-                    <?php foreach ($allBrands as $brand): ?>
-                        <label class="filter-check">
-                            <input type="checkbox"
-                                   class="brand-filter"
-                                   value="<?= app_sanitize($brand['name']) ?>"
-                                   <?= in_array($brand['name'], $filterBrands, true) ? 'checked' : '' ?>>
-                            <span><?= app_sanitize($brand['name']) ?></span>
-                        </label>
-                    <?php endforeach; ?>
+                    <button class="btn btn-outline-light w-100 brand-toggle-btn"
+                            type="button"
+                            id="brandToggleBtn"
+                            aria-controls="brandCheckboxSection"
+                            aria-expanded="<?= $filterBrands ? 'true' : 'false' ?>">
+                        <?= $filterBrands ? 'Hide Brands' : 'Show Brands' ?>
+                    </button>
+                    <div id="brandCheckboxSection"
+                         class="brand-checkbox-section mt-2 <?= $filterBrands ? '' : 'is-hidden' ?>">
+                        <?php foreach ($allBrands as $brand): ?>
+                            <label class="filter-check mb-2">
+                                <input type="checkbox"
+                                       class="brand-filter"
+                                       value="<?= app_sanitize($brand['name']) ?>"
+                                       <?= in_array($brand['name'], $filterBrands, true) ? 'checked' : '' ?>>
+                                <span><?= app_sanitize($brand['name']) ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
 
                 <div class="filter-group">
@@ -214,19 +255,64 @@ $jsBase = $jsBase ?: '';
                                     <div class="card-category">#<?= (int) $product['productId'] ?> • <?= app_sanitize($product['brand'] ?? '') ?></div>
                                     <h5 class="card-title"><?= app_sanitize($product['name']) ?></h5>
                                     <p class="card-text"><?= app_sanitize($product['description']) ?></p>
-                                    <div class="card-price">$<?= number_format((float) $product['price'], 2) ?></div>
+                                    <div class="card-price">₱<?= number_format((float) $product['price'], 2) ?></div>
                                     <div class="stock-note"><?= (int) $product['stock'] ?> in stock</div>
                                 </div>
 
                                 <div class="card-footer-custom">
                                     <button class="btn-card btn-card-primary add-to-cart-btn"
                                             data-product-id="<?= (int) $product['productId'] ?>">Add to Cart</button>
-                                    <button class="btn-card btn-card-outline" type="button">ID <?= (int) $product['productId'] ?></button>
+                                    <a class="btn-card btn-card-outline"
+                                       href="moreproduct.php?product_id=<?= (int) $product['productId'] ?>">More</a>
                                 </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
+
+                <?php if ($totalProducts > 0 && $totalPages > 1): ?>
+                    <nav class="mt-4" aria-label="Product pagination">
+                        <ul class="pagination justify-content-center">
+                            <?php
+                            $query = $_GET;
+                            $currentPageNum = (int) $currentPage;
+                            $totalPagesNum  = (int) $totalPages;
+                            $prevPage = $currentPageNum - 1;
+                            $nextPage = $currentPageNum + 1;
+                            ?>
+                            <li class="page-item <?= $currentPageNum <= 1 ? 'disabled' : '' ?>">
+                                <?php if ($currentPageNum <= 1): ?>
+                                    <span class="page-link">Previous</span>
+                                <?php else: ?>
+                                    <?php $query['page'] = $prevPage; ?>
+                                    <a class="page-link" href="product.php?<?= http_build_query($query) ?>">Previous</a>
+                                <?php endif; ?>
+                            </li>
+
+                            <?php for ($p = 1; $p <= $totalPagesNum; $p++): ?>
+                                <?php if ($p === 1 || $p === $totalPagesNum || abs($p - $currentPageNum) <= 1): ?>
+                                    <?php $query['page'] = $p; ?>
+                                    <li class="page-item <?= $p === $currentPageNum ? 'active' : '' ?>">
+                                        <a class="page-link" href="product.php?<?= http_build_query($query) ?>"><?= $p ?></a>
+                                    </li>
+                                <?php elseif ($p === 2 && $currentPageNum > 4): ?>
+                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                <?php elseif ($p === $totalPagesNum - 1 && $currentPageNum < $totalPagesNum - 3): ?>
+                                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+
+                            <li class="page-item <?= $currentPageNum >= $totalPagesNum ? 'disabled' : '' ?>">
+                                <?php if ($currentPageNum >= $totalPagesNum): ?>
+                                    <span class="page-link">Next</span>
+                                <?php else: ?>
+                                    <?php $query['page'] = $nextPage; ?>
+                                    <a class="page-link" href="product.php?<?= http_build_query($query) ?>">Next</a>
+                                <?php endif; ?>
+                            </li>
+                        </ul>
+                    </nav>
+                <?php endif; ?>
             </div>
         </div>
     </div>

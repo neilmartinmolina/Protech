@@ -57,7 +57,7 @@ $subtotal = app_cart_total();
                                     <div class="text-muted small">#<?= (int) $item['productId'] ?> • <?= app_sanitize($item['brand']) ?></div>
                                     <h5 class="text-white mb-1"><?= app_sanitize($item['name']) ?></h5>
                                     <div class="text-secondary"><?= app_sanitize($item['category']) ?></div>
-                                    <div class="text-secondary small mt-2">$<?= number_format((float) $item['price'], 2) ?> each</div>
+                                    <div class="text-secondary small mt-2">₱<?= number_format((float) $item['price'], 2) ?> each</div>
                                 </div>
                                 <div class="text-end">
                                     <input class="qty-input mb-2 item-qty" type="number" min="1" max="<?= (int) $item['stock'] ?>" value="<?= (int) $item['quantity'] ?>">
@@ -65,7 +65,7 @@ $subtotal = app_cart_total();
                                         <button class="action-btn update-item">Update</button>
                                         <button class="action-btn remove-item">Remove</button>
                                     </div>
-                                    <div class="text-white fw-bold mt-3">$<?= number_format((float) $item['line_total'], 2) ?></div>
+                                    <div class="text-white fw-bold mt-3">₱<?= number_format((float) $item['line_total'], 2) ?></div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -75,9 +75,9 @@ $subtotal = app_cart_total();
                     <div class="cart-summary">
                         <h4 class="text-white mb-3">Summary</h4>
                         <div class="d-flex justify-content-between mb-2"><span>Items</span><span><?= app_cart_count() ?></span></div>
-                        <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><span>$<?= number_format($subtotal, 2) ?></span></div>
+                        <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><span>₱<?= number_format($subtotal, 2) ?></span></div>
                         <div class="d-flex justify-content-between mb-4"><span>Shipping</span><span>Calculated later</span></div>
-                        <div class="d-flex justify-content-between fs-5 text-white mb-4"><strong>Total</strong><strong>$<?= number_format($subtotal, 2) ?></strong></div>
+                        <div class="d-flex justify-content-between fs-5 text-white mb-4"><strong>Total</strong><strong>₱<?= number_format($subtotal, 2) ?></strong></div>
                         <?php if (app_current_user()): ?>
                             <form method="post">
                                 <input type="hidden" name="action" value="checkout">

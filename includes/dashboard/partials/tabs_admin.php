@@ -10,7 +10,7 @@
         <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon green"><i class="fa-solid fa-users"></i></div><div class="stat-value"><?= $adminStats['users'] ?></div><div class="stat-label">Customers</div></div></div>
         <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon orange"><i class="fa-solid fa-store"></i></div><div class="stat-value"><?= $adminStats['sellers'] ?></div><div class="stat-label">Approved Sellers</div></div></div>
         <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon blue"><i class="fa-solid fa-receipt"></i></div><div class="stat-value"><?= $adminStats['orders'] ?></div><div class="stat-label">Orders</div></div></div>
-        <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon red"><i class="fa-solid fa-dollar-sign"></i></div><div class="stat-value">$<?= number_format($adminStats['revenue'], 2) ?></div><div class="stat-label">Revenue</div></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="stat-card"><div class="stat-icon red"><i class="fa-solid fa-dollar-sign"></i></div><div class="stat-value">₱<?= number_format($adminStats['revenue'], 2) ?></div><div class="stat-label">Revenue</div></div></div>
     </div>
     <?php if (($adminStats['pending_sellers'] ?? 0) > 0): ?>
         <div class="alert mb-4" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:12px;color:#ffd479;padding:.85rem 1rem;font-size:.9rem;">
@@ -106,7 +106,7 @@
                             <td><?= app_sanitize($order['customer_name']) ?></td>
                             <td><?= app_sanitize($order['seller_name']) ?></td>
                             <td><?= (int) $order['item_count'] ?></td>
-                            <td>$<?= number_format((float) $order['total_amount'], 2) ?></td>
+                            <td>₱<?= number_format((float) $order['total_amount'], 2) ?></td>
                             <td><span class="pill <?= app_sanitize($order['status']) ?>"><?= app_sanitize(ucfirst($order['status'])) ?></span></td>
                             <td><?= app_sanitize($order['created_at']) ?></td>
                             <td>
@@ -144,7 +144,7 @@
                             <td><?= app_sanitize($product['seller_name']) ?></td>
                             <td><?= app_sanitize($product['brand']) ?></td>
                             <td><?= app_sanitize($product['category']) ?></td>
-                            <td>$<?= number_format((float) $product['price'], 2) ?></td>
+                            <td>₱<?= number_format((float) $product['price'], 2) ?></td>
                             <td><?= (int) $product['stock'] ?></td>
                             <td><span class="pill <?= (int) $product['is_active'] ? 'completed' : 'cancelled' ?>"><?= (int) $product['is_active'] ? 'Active' : 'Inactive' ?></span></td>
                         </tr>

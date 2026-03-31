@@ -7,17 +7,30 @@
     const SEARCH_DEBOUNCE_MS = 500;
 
     function getCartActionUrl() {
-        if (window.__PRODUCT_PAGE__?.cartActionUrl) {
+        if (window.__PRODUCT_PAGE__ && window.__PRODUCT_PAGE__.cartActionUrl) {
             return window.__PRODUCT_PAGE__.cartActionUrl;
         }
         return 'cart_action.php';
     }
 
     function getCartRedirectUrl() {
-        if (window.__PRODUCT_PAGE__?.cartUrl) {
+        if (window.__PRODUCT_PAGE__ && window.__PRODUCT_PAGE__.cartUrl) {
             return window.__PRODUCT_PAGE__.cartUrl;
         }
         return 'cart.php';
+    }
+
+    function initBrandToggle() {
+        const toggleBtn = document.getElementById('brandToggleBtn');
+        const section = document.getElementById('brandCheckboxSection');
+        if (!toggleBtn || !section) return;
+
+        toggleBtn.addEventListener('click', () => {
+            const willShow = section.classList.contains('is-hidden');
+            section.classList.toggle('is-hidden');
+            toggleBtn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+            toggleBtn.textContent = willShow ? 'Hide Brands' : 'Show Brands';
+        });
     }
 
     function applyFilters() {
@@ -103,6 +116,7 @@
     }
 
     function init() {
+        initBrandToggle();
         initFilters();
         initAddToCart();
     }
