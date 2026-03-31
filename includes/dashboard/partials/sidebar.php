@@ -14,6 +14,7 @@
     <div class="sidebar-section-label"><?= app_sanitize(ucfirst($role)) ?> Panel</div>
     <ul class="sidebar-nav">
         <?php foreach ($allowedTabs as $key => [$label, $icon]): ?>
+            <?php if ($key === 'about_dev') continue; ?>
             <li>
                 <a href="dashboard.php?tab=<?= app_sanitize($key) ?>" class="nav-link <?= $tab === $key ? 'active' : '' ?>">
                     <i class="<?= app_sanitize($icon) ?>"></i> <?= app_sanitize($label) ?>
@@ -24,6 +25,17 @@
             </li>
         <?php endforeach; ?>
     </ul>
+    <?php if ($role === 'admin'): ?>
+    <ul class="sidebar-nav mt-2">
+        <li>
+            <a href="aboutdev.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'aboutdev.php' ? 'active' : '' ?>">
+                <i class="fa-solid fa-circle-user"></i> About Dev
+            </a>
+        </li>
+    </ul>
+    <?php endif; ?>
+
+    <div class="sidebar-footer">
     <div class="sidebar-footer">
         <div class="dropdown">
             <a href="#" class="user-card dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">

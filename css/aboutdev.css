@@ -1,0 +1,265 @@
+/* ================================================================
+   ABOUT DEV  —  dashboard partial styles
+   File: css/about_dev.css  (add to $pageCss in dashboard.php)
+   Depends on dashboard.css vars:
+     --surface, --surface-light, --border, --radius-md,
+     --primary (#ff7315), --text-primary, --text-secondary,
+     --text-muted, --warning, --success
+   Scoped entirely under .about-dev-wrap — zero collision risk.
+   ================================================================ */
+
+/* ── Section wrapper ──────────────────────────────────────────── */
+.about-dev-wrap {
+    padding: 1.5rem 0;
+}
+
+/* ── Section header — mirrors .section-header > .bg-text + h2 ── */
+.dev-section-header {
+    position: relative;
+    margin-bottom: 1.75rem;
+}
+.dev-bg-text {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-60%);
+    font-size: clamp(2.8rem, 7vw, 4.5rem);
+    font-weight: 900;
+    color: var(--primary, #ff7315);
+    opacity: 0.06;
+    user-select: none;
+    pointer-events: none;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    white-space: nowrap;
+}
+.dev-section-title {
+    position: relative;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    padding-bottom: 0.5rem;
+}
+.dev-section-title::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 3px;
+    background: var(--primary, #ff7315);
+    border-radius: 2px;
+    margin-top: 0.45rem;
+}
+
+/* ── Portrait — mirrors .about-section img with grayscale ─────── */
+.dev-portrait {
+    filter: grayscale(100%);
+    transition: filter 0.4s ease;
+    border: 1px solid var(--border);
+}
+.dev-portrait:hover {
+    filter: grayscale(0%);
+}
+
+/* ── Bio text — mirrors .about-title / .about-subtitle / .lead ── */
+.dev-about-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.2rem;
+}
+.dev-about-subtitle {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--primary, #ff7315);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.9rem;
+}
+.dev-lead {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.7;
+}
+
+/* ── Info list — mirrors .info-list exactly ───────────────────── */
+.dev-info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.dev-info-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+.dev-info-list strong {
+    color: var(--text-primary);
+    min-width: 90px;
+    flex-shrink: 0;
+}
+.dev-info-list span {
+    color: var(--text-secondary);
+}
+.dev-email-link {
+    color: var(--primary, #ff7315);
+    text-decoration: none;
+    transition: opacity 0.15s;
+}
+.dev-email-link:hover {
+    opacity: 0.75;
+}
+
+/* ── Social buttons ───────────────────────────────────────────── */
+.dev-socials {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.dev-social-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 115, 21, 0.08);
+    border: 1px solid rgba(255, 115, 21, 0.2);
+    color: var(--primary, #ff7315);
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+.dev-social-btn:hover {
+    background: var(--primary, #ff7315);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+/* ── Skills box title — mirrors .skills-box h3 ────────────────── */
+.dev-skills-box-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1.25rem;
+    position: relative;
+    display: inline-block;
+}
+.dev-skills-box-title::after {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: rgba(255, 115, 21, 0.3);
+    border-radius: 2px;
+    margin-top: 0.3rem;
+}
+
+/* ── Core skills grid — mirrors .skills-logo-grid ────────────── */
+.dev-skills-logo-grid {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+.dev-skill-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: default;
+}
+.dev-skill-item span {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.dev-skill-logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    transition: transform 0.2s ease;
+    filter: drop-shadow(0 0 0px transparent);
+}
+.dev-skill-logo:hover,
+.dev-skill-item:hover .dev-skill-logo {
+    transform: translateY(-4px);
+    filter: drop-shadow(0 4px 8px rgba(255, 115, 21, 0.3));
+}
+
+/* ── Carousel — mirrors .auto-carousel-container + .auto-carousel-track ── */
+.dev-auto-carousel-container {
+    overflow: hidden;
+    width: 100%;
+    /* fade edges so it feels infinite */
+    -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        #000 10%,
+        #000 90%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        #000 10%,
+        #000 90%,
+        transparent 100%
+    );
+}
+.dev-auto-carousel-track {
+    display: flex;
+    gap: 1.5rem;
+    width: max-content;
+    animation: devCarouselScroll 26s linear infinite;
+}
+.dev-auto-carousel-track:hover {
+    animation-play-state: paused;
+}
+
+/* -50% = exactly one full set width (2 identical sets in DOM) */
+@keyframes devCarouselScroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.dev-carousel-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 0.85rem;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    min-width: 80px;
+    flex-shrink: 0;
+    transition: opacity 0.2s;
+    cursor: default;
+}
+.dev-carousel-item:hover {
+    opacity: 0.7;
+}
+.dev-carousel-item span {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 991.98px) {
+    .dev-about-title { font-size: 1.15rem; }
+}
+@media (max-width: 767.98px) {
+    .dev-skills-logo-grid { gap: 1rem; }
+    .dev-skill-logo { width: 38px; height: 38px; }
+    .dev-info-list strong { min-width: 75px; }
+}
