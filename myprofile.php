@@ -57,13 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $firstName  = trim($_POST['first_name']  ?? '');
         $lastName   = trim($_POST['last_name']   ?? '');
         $username   = trim($_POST['username']    ?? '');
-        $storeName  = trim($_POST['store_name']  ?? '');
         $avatarFile = $_FILES['avatar'] ?? null;
 
         if ($firstName === '') $errors[] = 'First name is required.';
         if ($lastName  === '') $errors[] = 'Last name is required.';
         if (!preg_match('/^[a-zA-Z0-9_]{3,50}$/', $username)) $errors[] = 'Username must be 3–50 characters (letters, numbers, underscores only).';
-        if (($user['role'] ?? '') === 'seller' && $storeName === '') $errors[] = 'Store name is required for sellers.';
 
         $avatarResult = ['success' => true, 'path' => $user['avatar_path'] ?? null];
 
@@ -83,8 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$errors) {
             $avatarPath = $avatarResult['path'] ?? ($user['avatar_path'] ?? null);
-            $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, store_name=?, avatar_path=? WHERE userId=?');
-            $stmt->bind_param('sssssi', $firstName, $lastName, $username, $storeName, $avatarPath, $user['userId']);
+            $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, avatar_path=? WHERE userId=?');
+            $stmt->bind_param('ssssi', $firstName, $lastName, $username, $avatarPath, $user['userId']);
             $stmt->execute();
             $stmt->close();
 

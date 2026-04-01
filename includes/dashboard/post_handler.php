@@ -56,10 +56,10 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
                 $stmt = $conn->prepare("
                     UPDATE users
-                    SET role = 'seller', seller_status = 'approved', store_name = ?
+                    SET role = 'seller', seller_status = 'approved'
                     WHERE userId = ?
                 ");
-                $stmt->bind_param('si', $storeName, $userId);
+                $stmt->bind_param('i', $userId);
                 $stmt->execute();
                 $stmt->close();
 
@@ -270,6 +270,14 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
         } else {
             $avatarFile = $_FILES['avatar'] ?? ['error' => UPLOAD_ERR_NO_FILE];
             $avatarPath = null;
+            $reviewerId = (int) $user['userId'];
+
+            if ($newRole !== 'seller') {
+                $sellerStatus = 'not_applicable';
+                $storeName    = '';
+            } elseif ($sellerStatus === 'approved' && $storeName === '') {
+                $flash = ['type' => 'danger', 'message' => 'Store name is required when approving a seller.'];
+            }
 
             $checkUnique = static function (mysqli $c, string $field, string $value, int $excludeId) use (&$flash): bool {
                 $stmt = $c->prepare("SELECT userId FROM users WHERE {$field} = ? AND userId != ? LIMIT 1");
@@ -285,6 +293,34 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                     return false;
                 }
                 return true;
+            };
+
+            $upsertSellerApplication = static function (mysqli $c, int $uid, string $status, string $store, int $adminId) : void {
+                if ($store === '' || !app_table_exists($c, 'seller_applications')) {
+                    return;
+                }
+                $appStatus = $status === 'approved'
+                    ? 'approved'
+                    : ($status === 'rejected' ? 'rejected' : 'pending');
+
+                if ($appStatus === 'pending') {
+                    $stmt = $c->prepare("
+                        INSERT INTO seller_applications (userId, store_name, reason, status, created_at)
+                        VALUES (?, ?, NULL, 'pending', NOW())
+                    ");
+                    $stmt->bind_param('is', $uid, $store);
+                    $stmt->execute();
+                    $stmt->close();
+                    return;
+                }
+
+                $stmt = $c->prepare("
+                    INSERT INTO seller_applications (userId, store_name, reason, status, reviewedByUserId, reviewed_at, created_at)
+                    VALUES (?, ?, NULL, ?, ?, NOW(), NOW())
+                ");
+                $stmt->bind_param('issi', $uid, $store, $appStatus, $adminId);
+                $stmt->execute();
+                $stmt->close();
             };
 
             if ($targetUserId === 0) {
@@ -306,13 +342,12 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                         $stmt = $conn->prepare('
                             INSERT INTO users
                                 (first_name, last_name, username, email, password_hash,
-                                 role, seller_status, store_name, avatar_path, is_verified, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+                                 role, seller_status, avatar_path, is_verified, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
                         ');
-                        $storeParam = $storeName !== '' ? $storeName : null;
                         $avatarIns  = $avatarPath;
                         $stmt->bind_param(
-                            'sssssssss',
+                            'ssssssss',
                             $firstName,
                             $lastName,
                             $username,
@@ -320,10 +355,13 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                             $hash,
                             $newRole,
                             $sellerStatus,
-                            $storeParam,
                             $avatarIns
                         );
                         if ($stmt->execute()) {
+                            $newUserId = (int) $conn->insert_id;
+                            if ($newRole === 'seller') {
+                                $upsertSellerApplication($conn, $newUserId, $sellerStatus, $storeName, $reviewerId);
+                            }
                             $flash = ['type' => 'success', 'message' => 'User created successfully.'];
                         } else {
                             $flash = ['type' => 'danger', 'message' => 'Could not create user: ' . $stmt->error];
@@ -360,32 +398,11 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                     $flash = ['type' => 'danger', 'message' => 'Password must be at least 8 characters.'];
                                 } else {
                                     $hash = password_hash($passwordPlain, PASSWORD_BCRYPT);
-                                    $storeParam = $storeName !== '' ? $storeName : null;
                                     if ($avatarPath !== null) {
                                         $stmt = $conn->prepare('
                                             UPDATE users SET
                                                 first_name = ?, last_name = ?, username = ?, email = ?,
-                                                password_hash = ?, role = ?, seller_status = ?, store_name = ?, avatar_path = ?
-                                            WHERE userId = ?
-                                        ');
-                                        $stmt->bind_param(
-                                            'sssssssssi',
-                                            $firstName,
-                                            $lastName,
-                                            $username,
-                                            $email,
-                                            $hash,
-                                            $newRole,
-                                            $sellerStatus,
-                                            $storeParam,
-                                            $avatarPath,
-                                            $targetUserId
-                                        );
-                                    } else {
-                                        $stmt = $conn->prepare('
-                                            UPDATE users SET
-                                                first_name = ?, last_name = ?, username = ?, email = ?,
-                                                password_hash = ?, role = ?, seller_status = ?, store_name = ?
+                                                password_hash = ?, role = ?, seller_status = ?, avatar_path = ?
                                             WHERE userId = ?
                                         ');
                                         $stmt->bind_param(
@@ -397,21 +414,41 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                             $hash,
                                             $newRole,
                                             $sellerStatus,
-                                            $storeParam,
+                                            $avatarPath,
+                                            $targetUserId
+                                        );
+                                    } else {
+                                        $stmt = $conn->prepare('
+                                            UPDATE users SET
+                                                first_name = ?, last_name = ?, username = ?, email = ?,
+                                                password_hash = ?, role = ?, seller_status = ?
+                                            WHERE userId = ?
+                                        ');
+                                        $stmt->bind_param(
+                                            'sssssssi',
+                                            $firstName,
+                                            $lastName,
+                                            $username,
+                                            $email,
+                                            $hash,
+                                            $newRole,
+                                            $sellerStatus,
                                             $targetUserId
                                         );
                                     }
                                     $stmt->execute();
                                     $stmt->close();
+                                    if ($newRole === 'seller') {
+                                        $upsertSellerApplication($conn, $targetUserId, $sellerStatus, $storeName, $reviewerId);
+                                    }
                                     $flash = ['type' => 'success', 'message' => 'User updated successfully.'];
                                 }
                             } else {
-                                $storeParam = $storeName !== '' ? $storeName : null;
                                 if ($avatarPath !== null) {
                                     $stmt = $conn->prepare('
                                         UPDATE users SET
                                             first_name = ?, last_name = ?, username = ?, email = ?,
-                                            role = ?, seller_status = ?, store_name = ?, avatar_path = ?
+                                            role = ?, seller_status = ?, avatar_path = ?
                                         WHERE userId = ?
                                     ');
                                     $stmt->bind_param(
@@ -422,7 +459,6 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                         $email,
                                         $newRole,
                                         $sellerStatus,
-                                        $storeParam,
                                         $avatarPath,
                                         $targetUserId
                                     );
@@ -430,7 +466,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                     $stmt = $conn->prepare('
                                         UPDATE users SET
                                             first_name = ?, last_name = ?, username = ?, email = ?,
-                                            role = ?, seller_status = ?, store_name = ?
+                                            role = ?, seller_status = ?
                                         WHERE userId = ?
                                     ');
                                     $stmt->bind_param(
@@ -441,12 +477,14 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                         $email,
                                         $newRole,
                                         $sellerStatus,
-                                        $storeParam,
                                         $targetUserId
                                     );
                                 }
                                 $stmt->execute();
                                 $stmt->close();
+                                if ($newRole === 'seller') {
+                                    $upsertSellerApplication($conn, $targetUserId, $sellerStatus, $storeName, $reviewerId);
+                                }
                                 $flash = ['type' => 'success', 'message' => 'User updated successfully.'];
                             }
                         }
@@ -493,10 +531,19 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                     $rt->execute();
                     $rt->close();
 
-                    $vt = $conn->prepare('DELETE FROM verification_tokens WHERE userId = ?');
-                    $vt->bind_param('i', $targetUserId);
-                    $vt->execute();
-                    $vt->close();
+                    if (app_table_exists($conn, 'email_verifications')) {
+                        $vt = $conn->prepare('DELETE FROM email_verifications WHERE userId = ?');
+                        $vt->bind_param('i', $targetUserId);
+                        $vt->execute();
+                        $vt->close();
+                    }
+
+                    if (app_table_exists($conn, 'password_resets')) {
+                        $pr = $conn->prepare('DELETE FROM password_resets WHERE userId = ?');
+                        $pr->bind_param('i', $targetUserId);
+                        $pr->execute();
+                        $pr->close();
+                    }
 
                     if (app_table_exists($conn, 'seller_applications')) {
                         $sa = $conn->prepare('DELETE FROM seller_applications WHERE userId = ?');
@@ -536,7 +583,12 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
             $flash = ['type' => 'danger', 'message' => 'Invalid order status selected.'];
         } else {
             if ($role === 'seller') {
-                $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE orderId = ? AND sellerUserId = ?');
+                $stmt = $conn->prepare('
+                    UPDATE orders o
+                    JOIN order_items oi ON oi.orderId = o.orderId
+                    SET o.status = ?
+                    WHERE o.orderId = ? AND oi.sellerUserId = ?
+                ');
                 $stmt->bind_param('sii', $status, $orderId, $user['userId']);
             } else {
                 $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE orderId = ?');

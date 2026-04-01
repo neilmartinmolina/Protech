@@ -11,10 +11,11 @@ if (!empty($token)) {
     if (!$conn->connect_error) {
         $conn->set_charset('utf8mb4');
         $stmt = $conn->prepare('
-            SELECT vt.userId, vt.expires_at, u.first_name
-            FROM verification_tokens vt
-            JOIN users u ON u.userId = vt.userId
-            WHERE vt.token = ?
+            SELECT ev.userId, ev.expires_at, ev.used_at, u.first_name
+            FROM email_verifications ev
+            JOIN users u ON u.userId = ev.userId
+            WHERE ev.token = ?
+            LIMIT 1
         ');
         $stmt->bind_param('s', $token);
         $stmt->execute();
@@ -23,11 +24,9 @@ if (!empty($token)) {
         $stmt->close();
 
         if ($row) {
-            if (strtotime($row['expires_at']) < time()) {
-                $del = $conn->prepare('DELETE FROM verification_tokens WHERE token = ?');
-                $del->bind_param('s', $token);
-                $del->execute();
-                $del->close();
+            if (!empty($row['used_at'])) {
+                $status = 'invalid';
+            } elseif (strtotime($row['expires_at']) < time()) {
                 $status = 'expired';
             } else {
                 $userId = (int) $row['userId'];
@@ -35,10 +34,12 @@ if (!empty($token)) {
                 $upd->bind_param('i', $userId);
                 $upd->execute();
                 $upd->close();
-                $del = $conn->prepare('DELETE FROM verification_tokens WHERE token = ?');
-                $del->bind_param('s', $token);
-                $del->execute();
-                $del->close();
+
+                $mark = $conn->prepare('UPDATE email_verifications SET used_at = NOW() WHERE token = ?');
+                $mark->bind_param('s', $token);
+                $mark->execute();
+                $mark->close();
+
                 $name   = htmlspecialchars($row['first_name']);
                 $status = 'success';
             }

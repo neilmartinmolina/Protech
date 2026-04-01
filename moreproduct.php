@@ -97,8 +97,12 @@ if ($productId > 0) {
     if ($product && !empty($product['sellerUserId'])) {
         $sellerStmt = $conn->prepare("
             SELECT
-                u.store_name,
                 u.avatar_path,
+                (SELECT sa.store_name
+                 FROM seller_applications sa
+                 WHERE sa.userId = u.userId AND sa.status = 'approved'
+                 ORDER BY sa.reviewed_at DESC
+                 LIMIT 1) AS store_name,
                 COUNT(p2.productId) AS product_count
             FROM users u
             LEFT JOIN products p2

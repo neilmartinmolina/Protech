@@ -110,13 +110,13 @@ try {
     $stmt = $conn->prepare('
         INSERT INTO users
             (first_name, last_name, username, email, password_hash,
-             role, seller_status, store_name, avatar_path, is_verified, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())
+             role, seller_status, avatar_path, is_verified, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())
     ');
     $stmt->bind_param(
-        'sssssssss',
+        'ssssssss',
         $firstName, $lastName, $username, $email, $passwordHash,
-        $role, $sellerStatus, $storeName, $avatarPath
+        $role, $sellerStatus, $avatarPath
     );
 
     if (!$stmt->execute()) {
@@ -126,10 +126,22 @@ try {
     $userId = (int) $conn->insert_id;
     $stmt->close();
 
+    if ($role === 'seller') {
+        $sapp = $conn->prepare('
+            INSERT INTO seller_applications (userId, store_name, reason, status, created_at)
+            VALUES (?, ?, NULL, \'pending\', NOW())
+        ');
+        $sapp->bind_param('is', $userId, $storeName);
+        if (!$sapp->execute()) {
+            throw new RuntimeException('Could not create seller application: ' . $sapp->error);
+        }
+        $sapp->close();
+    }
+
     $verifyToken = bin2hex(random_bytes(32));
     $expiresAt   = date('Y-m-d H:i:s', time() + 3600);
 
-    $stmt = $conn->prepare('INSERT INTO verification_tokens (userId, token, expires_at) VALUES (?, ?, ?)');
+    $stmt = $conn->prepare('INSERT INTO email_verifications (userId, token, expires_at) VALUES (?, ?, ?)');
     $stmt->bind_param('iss', $userId, $verifyToken, $expiresAt);
 
     if (!$stmt->execute()) {

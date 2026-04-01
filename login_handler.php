@@ -48,7 +48,7 @@ if ((int) $attemptCount >= 10) {
 // ── Lookup ────────────────────────────────────────────────────────────────────
 $stmt = $conn->prepare('
     SELECT userId, first_name, last_name, username, email, password_hash,
-           is_verified, role, seller_status, store_name, avatar_path
+           is_verified, role, seller_status, avatar_path
     FROM users
     WHERE email = ? OR username = ?
     LIMIT 1
@@ -107,9 +107,33 @@ $_SESSION['user'] = [
     'email'         => $user['email'],
     'role'          => $user['role'],
     'seller_status' => $user['seller_status'],
-    'store_name'    => $user['store_name'],
+    'store_name'    => null,
     'avatar_path'   => $user['avatar_path'],
 ];
+
+// Derive store name (normalized schema) from seller_applications
+if ($user['role'] === 'seller') {
+    $status = (string) ($user['seller_status'] ?? '');
+    $stmt = $conn->prepare("
+        SELECT store_name
+        FROM seller_applications
+        WHERE userId = ?
+          AND (
+            (? = 'approved' AND status = 'approved')
+            OR
+            (? != 'approved')
+          )
+        ORDER BY
+          CASE WHEN status = 'approved' THEN reviewed_at ELSE created_at END DESC
+        LIMIT 1
+    ");
+    $uid = (int) $user['userId'];
+    $stmt->bind_param('iss', $uid, $status, $status);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    $_SESSION['user']['store_name'] = $row['store_name'] ?? null;
+}
 
 // ── Remember Me ───────────────────────────────────────────────────────────────
 if ($rememberMe) {

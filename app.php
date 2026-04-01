@@ -75,11 +75,8 @@ function app_ensure_schema(mysqli $conn): void
     if (!app_column_exists($conn, 'users', 'seller_status')) {
         $conn->query("ALTER TABLE users ADD COLUMN seller_status VARCHAR(20) NOT NULL DEFAULT 'not_applicable' AFTER role");
     }
-    if (!app_column_exists($conn, 'users', 'store_name')) {
-        $conn->query("ALTER TABLE users ADD COLUMN store_name VARCHAR(150) DEFAULT NULL AFTER seller_status");
-    }
     if (!app_column_exists($conn, 'users', 'temp_password')) {
-        $conn->query("ALTER TABLE users ADD COLUMN temp_password VARCHAR(255) DEFAULT NULL AFTER store_name");
+        $conn->query("ALTER TABLE users ADD COLUMN temp_password VARCHAR(255) DEFAULT NULL AFTER seller_status");
     }
     if (!app_column_exists($conn, 'users', 'avatar_path')) {
         $conn->query("ALTER TABLE users ADD COLUMN avatar_path VARCHAR(255) DEFAULT NULL AFTER temp_password");
@@ -113,17 +110,17 @@ function app_ensure_schema(mysqli $conn): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // ── verification_tokens ───────────────────────────────────────────────────
+    // ── email_verifications (normalized schema) ───────────────────────────────
     $conn->query("
-        CREATE TABLE IF NOT EXISTS verification_tokens (
-            verificationTokenId INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-            userId              INT UNSIGNED  NOT NULL,
-            token               VARCHAR(64)   NOT NULL,
-            expires_at          DATETIME      NOT NULL,
-            created_at          DATETIME      DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_vt_token  (token),
-            INDEX      idx_vt_expires (expires_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            emailVerificationId INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            userId              INT(10) UNSIGNED NOT NULL,
+            token               CHAR(64)         NOT NULL,
+            expires_at          DATETIME         NOT NULL,
+            used_at             DATETIME         DEFAULT NULL,
+            UNIQUE KEY uq_ev_token (token),
+            KEY fk_ev_userId (userId)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
     // ── categories ────────────────────────────────────────────────────────────
@@ -197,12 +194,10 @@ function app_ensure_schema(mysqli $conn): void
         CREATE TABLE IF NOT EXISTS orders (
             orderId      INT(10) UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
             userId       INT(10) UNSIGNED  NOT NULL,
-            sellerUserId INT(10) UNSIGNED  DEFAULT NULL,
             total_amount DECIMAL(10,2)     NOT NULL DEFAULT 0.00,
             status       VARCHAR(30)       NOT NULL DEFAULT 'placed',
             created_at   DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_ord_userId       (userId),
-            INDEX idx_ord_sellerUserId (sellerUserId),
             INDEX idx_ord_status       (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
@@ -357,7 +352,7 @@ function app_refresh_session_user(int $userId): ?array
     $conn = app_db();
     $stmt = $conn->prepare("
         SELECT userId, first_name, last_name, username, email,
-               role, seller_status, store_name, avatar_path
+               role, seller_status, avatar_path
         FROM users
         WHERE userId = ?
         LIMIT 1
@@ -372,6 +367,29 @@ function app_refresh_session_user(int $userId): ?array
         return null;
     }
 
+    $storeName = null;
+    if (($user['role'] ?? '') === 'seller') {
+        $stmt = $conn->prepare("
+            SELECT store_name
+            FROM seller_applications
+            WHERE userId = ?
+              AND (
+                (? = 'approved' AND status = 'approved')
+                OR
+                (? != 'approved')
+              )
+            ORDER BY
+              CASE WHEN status = 'approved' THEN reviewed_at ELSE created_at END DESC
+            LIMIT 1
+        ");
+        $sellerStatus = (string) ($user['seller_status'] ?? '');
+        $stmt->bind_param('iss', $userId, $sellerStatus, $sellerStatus);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $storeName = $row['store_name'] ?? null;
+    }
+
     $_SESSION['user'] = [
         'userId'        => (int) $user['userId'],
         'firstName'     => $user['first_name'],
@@ -380,7 +398,7 @@ function app_refresh_session_user(int $userId): ?array
         'email'         => $user['email'],
         'role'          => $user['role'],
         'seller_status' => $user['seller_status'],
-        'store_name'    => $user['store_name'],
+        'store_name'    => $storeName,
         'avatar_path'   => $user['avatar_path'] ?? null,
     ];
 
@@ -593,16 +611,28 @@ function app_get_orders_for_seller(?int $sellerId = null): array
 
     if ($sellerId === null) {
         $stmt = $conn->prepare("
-            SELECT o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
-                   CONCAT(u.first_name, ' ', u.last_name)          AS customer_name,
-                   COALESCE(s.store_name, s.username, 'Marketplace') AS seller_name,
-                   COUNT(oi.orderItemId)                             AS item_count
-            FROM       orders      o
-            JOIN       users       u  ON u.userId      = o.userId
-            LEFT JOIN  users       s  ON s.userId      = o.sellerUserId
-            LEFT JOIN  order_items oi ON oi.orderId    = o.orderId
-            GROUP BY o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
-                     u.first_name, u.last_name, s.store_name, s.username
+            SELECT
+                o.orderId,
+                o.userId,
+                o.total_amount,
+                o.status,
+                o.created_at,
+                CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
+                COUNT(oi.orderItemId)                  AS item_count,
+                GROUP_CONCAT(DISTINCT COALESCE(
+                    (SELECT sa.store_name
+                     FROM seller_applications sa
+                     WHERE sa.userId = s.userId AND sa.status = 'approved'
+                     ORDER BY sa.reviewed_at DESC
+                     LIMIT 1),
+                    s.username,
+                    'Marketplace'
+                ) SEPARATOR ', ') AS seller_name
+            FROM orders o
+            JOIN users u ON u.userId = o.userId
+            LEFT JOIN order_items oi ON oi.orderId = o.orderId
+            LEFT JOIN users s ON s.userId = oi.sellerUserId
+            GROUP BY o.orderId, o.userId, o.total_amount, o.status, o.created_at, u.first_name, u.last_name
             ORDER BY o.created_at DESC
         ");
         $stmt->execute();
@@ -612,15 +642,19 @@ function app_get_orders_for_seller(?int $sellerId = null): array
     }
 
     $stmt = $conn->prepare("
-        SELECT o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
-               CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
-               COUNT(oi.orderItemId)                   AS item_count
-        FROM       orders      o
-        JOIN       users       u  ON u.userId   = o.userId
-        LEFT JOIN  order_items oi ON oi.orderId = o.orderId
-        WHERE o.sellerUserId = ?
-        GROUP BY o.orderId, o.userId, o.sellerUserId, o.total_amount, o.status, o.created_at,
-                 u.first_name, u.last_name
+        SELECT
+            o.orderId,
+            o.userId,
+            o.total_amount,
+            o.status,
+            o.created_at,
+            CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
+            COUNT(oi.orderItemId)                  AS item_count
+        FROM orders o
+        JOIN users u ON u.userId = o.userId
+        JOIN order_items oi ON oi.orderId = o.orderId
+        WHERE oi.sellerUserId = ?
+        GROUP BY o.orderId, o.userId, o.total_amount, o.status, o.created_at, u.first_name, u.last_name
         ORDER BY o.created_at DESC
     ");
     $stmt->bind_param('i', $sellerId);
@@ -694,8 +728,7 @@ function app_checkout(int $userId): array
             $grouped[$sellerKey]['total'] += $lineTotal;
         }
 
-        $orderStmt            = $conn->prepare("INSERT INTO orders (userId, sellerUserId, total_amount, status) VALUES (?, ?, ?, 'placed')");
-        $marketplaceOrderStmt = $conn->prepare("INSERT INTO orders (userId, sellerUserId, total_amount, status) VALUES (?, NULL, ?, 'placed')");
+        $orderStmt = $conn->prepare("INSERT INTO orders (userId, total_amount, status) VALUES (?, ?, 'placed')");
         $itemStmt             = $conn->prepare("INSERT INTO order_items (orderId, productId, sellerUserId, product_name, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)");
         $stockStmt            = $conn->prepare("UPDATE products SET stock = stock - ? WHERE productId = ?");
 
@@ -704,13 +737,8 @@ function app_checkout(int $userId): array
             $sellerId = $group['sellerUserId'];
             $total    = $group['total'];
 
-            if ($sellerId === null) {
-                $marketplaceOrderStmt->bind_param('id', $userId, $total);
-                $marketplaceOrderStmt->execute();
-            } else {
-                $orderStmt->bind_param('iid', $userId, $sellerId, $total);
-                $orderStmt->execute();
-            }
+            $orderStmt->bind_param('id', $userId, $total);
+            $orderStmt->execute();
             $orderId           = (int) $conn->insert_id;
             $createdOrderIds[] = $orderId;
 
@@ -731,7 +759,6 @@ function app_checkout(int $userId): array
         }
 
         $orderStmt->close();
-        $marketplaceOrderStmt->close();
         $itemStmt->close();
         $stockStmt->close();
 

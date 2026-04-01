@@ -85,7 +85,15 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
                    b.name AS brand,
                    c.name AS category,
                    p.price, p.stock, p.is_active,
-                   COALESCE(u.store_name, u.username, 'Marketplace') AS seller_name
+                   COALESCE(
+                       (SELECT sa.store_name
+                        FROM seller_applications sa
+                        WHERE sa.userId = u.userId AND sa.status = 'approved'
+                        ORDER BY sa.reviewed_at DESC
+                        LIMIT 1),
+                       u.username,
+                       'Marketplace'
+                   ) AS seller_name
             FROM products p
             LEFT JOIN brands     b ON b.brandId    = p.brandId
             LEFT JOIN categories c ON c.categoryId = p.categoryId
@@ -96,15 +104,27 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
 
         if (app_column_exists($conn, 'users', 'created_at')) {
             $result = $conn->query("
-                SELECT userId, first_name, last_name, username, email, role, seller_status, store_name, avatar_path, created_at
-                FROM users
-                ORDER BY created_at DESC, userId DESC
+                SELECT
+                    u.userId, u.first_name, u.last_name, u.username, u.email, u.role, u.seller_status, u.avatar_path, u.created_at,
+                    (SELECT sa.store_name
+                     FROM seller_applications sa
+                     WHERE sa.userId = u.userId AND sa.status = 'approved'
+                     ORDER BY sa.reviewed_at DESC
+                     LIMIT 1) AS store_name
+                FROM users u
+                ORDER BY u.created_at DESC, u.userId DESC
             ");
         } else {
             $result = $conn->query("
-                SELECT userId, first_name, last_name, username, email, role, seller_status, store_name, avatar_path
-                FROM users
-                ORDER BY userId DESC
+                SELECT
+                    u.userId, u.first_name, u.last_name, u.username, u.email, u.role, u.seller_status, u.avatar_path,
+                    (SELECT sa.store_name
+                     FROM seller_applications sa
+                     WHERE sa.userId = u.userId AND sa.status = 'approved'
+                     ORDER BY sa.reviewed_at DESC
+                     LIMIT 1) AS store_name
+                FROM users u
+                ORDER BY u.userId DESC
             ");
         }
         $adminUsers = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
@@ -127,8 +147,8 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
 
         $sellerStats['products']         = (int)   ($conn->query("SELECT COUNT(*) AS c FROM products WHERE sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
         $sellerStats['active_products'] = (int)   ($conn->query("SELECT COUNT(*) AS c FROM products WHERE sellerUserId = {$sellerId} AND is_active = 1")->fetch_assoc()['c'] ?? 0);
-        $sellerStats['orders']          = (int)   ($conn->query("SELECT COUNT(*) AS c FROM orders WHERE sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
-        $sellerStats['revenue']         = (float) ($conn->query("SELECT COALESCE(SUM(total_amount),0) AS c FROM orders WHERE sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
+        $sellerStats['orders']          = (int)   ($conn->query("SELECT COUNT(DISTINCT o.orderId) AS c FROM orders o JOIN order_items oi ON oi.orderId = o.orderId WHERE oi.sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
+        $sellerStats['revenue']         = (float) ($conn->query("SELECT COALESCE(SUM(oi.quantity * oi.unit_price),0) AS c FROM order_items oi WHERE oi.sellerUserId = {$sellerId}")->fetch_assoc()['c'] ?? 0);
 
         $result = $conn->query("
             SELECT p.productId, p.name,
@@ -178,11 +198,12 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
         $sellerId = (int) $user['userId'];
 
         $chartRows = $conn->query("
-            SELECT DATE(created_at) AS order_day, COALESCE(SUM(total_amount),0) AS total
-            FROM orders
-            WHERE sellerUserId = {$sellerId}
-              AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-            GROUP BY DATE(created_at)
+            SELECT DATE(o.created_at) AS order_day, COALESCE(SUM(oi.quantity * oi.unit_price),0) AS total
+            FROM orders o
+            JOIN order_items oi ON oi.orderId = o.orderId
+            WHERE oi.sellerUserId = {$sellerId}
+              AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            GROUP BY DATE(o.created_at)
         ")->fetch_all(MYSQLI_ASSOC);
         foreach ($chartRows as $row) {
             $sellerRevenueByDay[date('M d', strtotime($row['order_day']))] = (float) $row['total'];
