@@ -247,6 +247,48 @@
             </form>
         `;
         }
+
+        const userModal = document.getElementById('userModal');
+        if (userModal) {
+            userModal.querySelector('.app-modal__slot').innerHTML = `
+            <form method="post" enctype="multipart/form-data" id="userForm" class="modal-form-grid two-col">
+                <input type="hidden" name="action" value="save_user">
+                <input type="hidden" name="user_id" value="">
+                <div><label>First name</label><input type="text" name="first_name" required autocomplete="given-name"></div>
+                <div><label>Last name</label><input type="text" name="last_name" required autocomplete="family-name"></div>
+                <div><label>Username</label><input type="text" name="username" required autocomplete="username"></div>
+                <div><label>Email</label><input type="email" name="email" required autocomplete="email"></div>
+                <div><label>Role</label>
+                    <select name="role" required>
+                        <option value="customer">Customer</option>
+                        <option value="seller">Seller</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div><label>Seller status</label>
+                    <select name="seller_status">
+                        <option value="not_applicable">Not applicable</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div class="full"><label>Store name</label><input type="text" name="store_name" placeholder="For seller accounts"></div>
+                <div class="full"><label>Password</label><input type="password" name="password" autocomplete="new-password" placeholder="Required for new users; leave blank to keep when editing"></div>
+                <div class="full"><label>Avatar</label><input type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif"></div>
+            </form>
+        `;
+        }
+
+        const deleteUserModal = document.getElementById('deleteUserModal');
+        if (deleteUserModal) {
+            deleteUserModal.querySelector('.app-modal__slot').innerHTML = `
+            <form method="post" id="deleteUserForm">
+                <input type="hidden" name="action" value="delete_user">
+                <input type="hidden" name="user_id" value="">
+            </form>
+        `;
+        }
     }
 
     function initCategoryIconMap() {

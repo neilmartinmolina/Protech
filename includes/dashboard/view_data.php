@@ -12,6 +12,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
     $menus = [
         'admin' => [
             'dashboard' => ['Dashboard',        'fa-solid fa-house'],
+            'users'     => ['Users',            'fa-solid fa-users'],
             'sellers'   => ['Seller Approvals', 'fa-solid fa-user-check'],
             'orders'    => ['Orders',           'fa-solid fa-receipt'],
             'products'  => ['Products',         'fa-solid fa-box'],
@@ -38,6 +39,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
     $adminStats          = [];
     $adminOrders         = [];
     $adminProducts       = [];
+    $adminUsers          = [];
     $sellerStats         = [];
     $sellerProducts      = [];
     $sellerOrders        = [];
@@ -91,6 +93,21 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
             ORDER BY p.created_at DESC
         ");
         $adminProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+
+        if (app_column_exists($conn, 'users', 'created_at')) {
+            $result = $conn->query("
+                SELECT userId, first_name, last_name, username, email, role, seller_status, store_name, avatar_path, created_at
+                FROM users
+                ORDER BY created_at DESC, userId DESC
+            ");
+        } else {
+            $result = $conn->query("
+                SELECT userId, first_name, last_name, username, email, role, seller_status, store_name, avatar_path
+                FROM users
+                ORDER BY userId DESC
+            ");
+        }
+        $adminUsers = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
         foreach ($queries as $key => $sql) {
             $result = $conn->query($sql);
@@ -191,6 +208,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
         'adminStats'            => $adminStats,
         'adminOrders'           => $adminOrders,
         'adminProducts'         => $adminProducts,
+        'adminUsers'            => $adminUsers,
         'sellerStats'           => $sellerStats,
         'sellerProducts'        => $sellerProducts,
         'sellerOrders'          => $sellerOrders,

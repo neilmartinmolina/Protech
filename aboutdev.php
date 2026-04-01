@@ -57,7 +57,7 @@ $pageCssExt = [];
 
                             <div class="col-lg-5 mb-4 mb-lg-0">
                                 <img
-                                    src="media/me.png"
+                                    src="media/DEV/me.png"
                                     alt="Neil Martin Molina"
                                     class="dev-portrait img-fluid rounded shadow-lg"
                                 >
@@ -161,39 +161,35 @@ $pageCssExt = [];
                         </div>
                     </div>
 
-                    <!-- Familiar / Academic — auto-scrolling carousel -->
+                    <!-- Familiar / Academic — hover-to-scroll
+                         Single set of items. No clones, no CSS animation.
+                         JS scrolls the container on mouseenter, stops on mouseleave.
+                         To add skills: update $familiarSkills array only.
+                    -->
                     <div class="panel-card">
                         <div class="dev-skills-box text-center">
                             <h3 class="dev-skills-box-title">Familiar / Academic</h3>
-                            <div class="dev-auto-carousel-container mt-4">
-                                <div class="dev-auto-carousel-track">
-                                    <?php
-                                    // Rendered EXACTLY twice: set 1 (visible) + set 2 (aria-hidden clone).
-                                    // The CSS animation translates -50% to loop seamlessly.
-                                    // If you add skills here, do NOT touch the PHP loop — update the array only.
-                                    $familiarSkills = [
-                                        ['src' => 'media/languagelogo/GitHub.png',       'label' => 'GitHub'],
-                                        ['src' => 'media/languagelogo/Git.png',          'label' => 'Git'],
-                                        ['src' => 'media/languagelogo/Java.png',         'label' => 'Java'],
-                                        ['src' => 'media/languagelogo/Python.png',       'label' => 'Python'],
-                                        ['src' => 'media/languagelogo/C.png',            'label' => 'C'],
-                                        ['src' => 'media/languagelogo/C++.png',          'label' => 'C++'],
-                                        ['src' => 'media/languagelogo/Tailwind CSS.png', 'label' => 'Tailwind CSS'],
-                                    ];
-                                    foreach ([0, 1] as $pass) {
-                                        foreach ($familiarSkills as $skill): ?>
-                                            <div class="dev-carousel-item"
-                                                 <?= $pass === 1 ? 'aria-hidden="true"' : '' ?>
-                                                 data-bs-toggle="tooltip" data-bs-placement="top"
-                                                 title="<?= htmlspecialchars($skill['label']) ?>">
-                                                <img src="<?= htmlspecialchars($skill['src']) ?>"
-                                                     alt="<?= htmlspecialchars($skill['label']) ?>"
-                                                     class="dev-skill-logo">
-                                                <span><?= htmlspecialchars($skill['label']) ?></span>
-                                            </div>
-                                        <?php endforeach;
-                                    } ?>
-                                </div>
+                            <div class="dev-scroll-carousel mt-4" id="devScrollCarousel">
+                                <?php
+                                $familiarSkills = [
+                                    ['src' => 'media/languagelogo/GitHub.png',       'label' => 'GitHub'],
+                                    ['src' => 'media/languagelogo/Git.png',          'label' => 'Git'],
+                                    ['src' => 'media/languagelogo/Java.png',         'label' => 'Java'],
+                                    ['src' => 'media/languagelogo/Python.png',       'label' => 'Python'],
+                                    ['src' => 'media/languagelogo/C.png',            'label' => 'C'],
+                                    ['src' => 'media/languagelogo/C++.png',          'label' => 'C++'],
+                                    ['src' => 'media/languagelogo/Tailwind CSS.png', 'label' => 'Tailwind CSS'],
+                                ];
+                                foreach ($familiarSkills as $skill): ?>
+                                    <div class="dev-carousel-item"
+                                         data-bs-toggle="tooltip" data-bs-placement="top"
+                                         title="<?= htmlspecialchars($skill['label']) ?>">
+                                        <img src="<?= htmlspecialchars($skill['src']) ?>"
+                                             alt="<?= htmlspecialchars($skill['label']) ?>"
+                                             class="dev-skill-logo">
+                                        <span><?= htmlspecialchars($skill['label']) ?></span>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                     </div>
@@ -208,9 +204,39 @@ $pageCssExt = [];
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Re-init Bootstrap tooltips (same pattern as your portfolio)
+    // Tooltips
     const tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipEls].forEach(el => new bootstrap.Tooltip(el));
+
+    // Hover-to-scroll carousel
+    (function () {
+        const track    = document.getElementById('devScrollCarousel');
+        const speed    = 1.2; // px per frame — adjust to taste
+        let   rafId    = null;
+        let   direction = 1; // 1 = forward, -1 = backward
+
+        function scroll() {
+            track.scrollLeft += speed * direction;
+
+            // Bounce at ends
+            if (track.scrollLeft + track.clientWidth >= track.scrollWidth) {
+                direction = -1;
+            } else if (track.scrollLeft <= 0) {
+                direction = 1;
+            }
+
+            rafId = requestAnimationFrame(scroll);
+        }
+
+        track.addEventListener('mouseenter', () => {
+            if (!rafId) rafId = requestAnimationFrame(scroll);
+        });
+
+        track.addEventListener('mouseleave', () => {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        });
+    })();
 </script>
 </body>
 </html>

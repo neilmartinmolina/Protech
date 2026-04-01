@@ -154,6 +154,7 @@
     content: '';
     display: block;
     width: 100%;
+    padding: 0 5rem;
     height: 2px;
     background: rgba(255, 115, 21, 0.3);
     border-radius: 2px;
@@ -194,64 +195,61 @@
     filter: drop-shadow(0 4px 8px rgba(255, 115, 21, 0.3));
 }
 
-/* ── Carousel — mirrors .auto-carousel-container + .auto-carousel-track ── */
-.dev-auto-carousel-container {
-    overflow: hidden;
-    width: 100%;
-    /* fade edges so it feels infinite */
+
+/* ── Scroll carousel — hover to scroll, no clones, no animation ── */
+.dev-scroll-carousel {
+    display: flex;
+    gap: 1.25rem;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 0.5rem 0.25rem 0.75rem;
+    scroll-behavior: smooth;
+    cursor: default;
+    /* hide scrollbar visually but keep it functional */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* fade edges */
     -webkit-mask-image: linear-gradient(
         to right,
         transparent 0%,
-        #000 10%,
-        #000 90%,
+        #000 8%,
+        #000 92%,
         transparent 100%
     );
     mask-image: linear-gradient(
         to right,
         transparent 0%,
-        #000 10%,
-        #000 90%,
+        #000 8%,
+        #000 92%,
         transparent 100%
     );
 }
-.dev-auto-carousel-track {
-    display: flex;
-    gap: 1.5rem;
-    width: max-content;
-    animation: devCarouselScroll 26s linear infinite;
-}
-.dev-auto-carousel-track:hover {
-    animation-play-state: paused;
-}
-
-/* -50% = exactly one full set width (2 identical sets in DOM) */
-@keyframes devCarouselScroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+.dev-scroll-carousel::-webkit-scrollbar {
+    display: none;
 }
 
 .dev-carousel-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.65rem 0.85rem;
-    background: transparent;
-    border: none;
-    border-radius: 10px;
-    min-width: 80px;
+    gap: 0.35rem;
     flex-shrink: 0;
     transition: opacity 0.2s;
     cursor: default;
+    min-width: 64px;
 }
 .dev-carousel-item:hover {
     opacity: 0.7;
 }
 .dev-carousel-item span {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
+}
+.dev-carousel-item .dev-skill-logo {
+    width: 36px;
+    height: 36px;
 }
 
 /* ── Responsive ───────────────────────────────────────────────── */

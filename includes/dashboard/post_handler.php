@@ -244,6 +244,288 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
         }
     }
 
+    // ── Save user (admin) ─────────────────────────────────────────────────────
+    if ($action === 'save_user' && app_is_admin($user)) {
+        $targetUserId   = (int) ($_POST['user_id'] ?? 0);
+        $firstName      = trim($_POST['first_name'] ?? '');
+        $lastName       = trim($_POST['last_name'] ?? '');
+        $username       = trim($_POST['username'] ?? '');
+        $email          = trim($_POST['email'] ?? '');
+        $newRole        = trim($_POST['role'] ?? 'customer');
+        $sellerStatus   = trim($_POST['seller_status'] ?? 'not_applicable');
+        $storeName      = trim($_POST['store_name'] ?? '');
+        $passwordPlain  = (string) ($_POST['password'] ?? '');
+
+        $allowedRoles  = ['customer', 'seller', 'admin'];
+        $allowedSeller = ['not_applicable', 'pending', 'approved', 'rejected'];
+
+        if ($firstName === '' || $lastName === '' || $username === '' || $email === '') {
+            $flash = ['type' => 'danger', 'message' => 'First name, last name, username, and email are required.'];
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $flash = ['type' => 'danger', 'message' => 'Please enter a valid email address.'];
+        } elseif (!in_array($newRole, $allowedRoles, true)) {
+            $flash = ['type' => 'danger', 'message' => 'Invalid role selected.'];
+        } elseif (!in_array($sellerStatus, $allowedSeller, true)) {
+            $flash = ['type' => 'danger', 'message' => 'Invalid seller status.'];
+        } else {
+            $avatarFile = $_FILES['avatar'] ?? ['error' => UPLOAD_ERR_NO_FILE];
+            $avatarPath = null;
+
+            $checkUnique = static function (mysqli $c, string $field, string $value, int $excludeId) use (&$flash): bool {
+                $stmt = $c->prepare("SELECT userId FROM users WHERE {$field} = ? AND userId != ? LIMIT 1");
+                if (!$stmt) {
+                    return false;
+                }
+                $stmt->bind_param('si', $value, $excludeId);
+                $stmt->execute();
+                $exists = (bool) $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+                if ($exists) {
+                    $flash = ['type' => 'danger', 'message' => ucfirst($field) . ' is already taken.'];
+                    return false;
+                }
+                return true;
+            };
+
+            if ($targetUserId === 0) {
+                if (strlen($passwordPlain) < 8) {
+                    $flash = ['type' => 'danger', 'message' => 'Password must be at least 8 characters for new users.'];
+                } elseif (!$checkUnique($conn, 'email', $email, 0) || !$checkUnique($conn, 'username', $username, 0)) {
+                    // flash set inside
+                } else {
+                    if (($avatarFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                        $av = app_store_avatar($avatarFile);
+                        if (!$av['success']) {
+                            $flash = ['type' => 'danger', 'message' => $av['message'] ?? 'Avatar upload failed.'];
+                        } else {
+                            $avatarPath = $av['path'];
+                        }
+                    }
+                    if ($flash === null) {
+                        $hash = password_hash($passwordPlain, PASSWORD_BCRYPT);
+                        $stmt = $conn->prepare('
+                            INSERT INTO users
+                                (first_name, last_name, username, email, password_hash,
+                                 role, seller_status, store_name, avatar_path, is_verified, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+                        ');
+                        $storeParam = $storeName !== '' ? $storeName : null;
+                        $avatarIns  = $avatarPath;
+                        $stmt->bind_param(
+                            'sssssssss',
+                            $firstName,
+                            $lastName,
+                            $username,
+                            $email,
+                            $hash,
+                            $newRole,
+                            $sellerStatus,
+                            $storeParam,
+                            $avatarIns
+                        );
+                        if ($stmt->execute()) {
+                            $flash = ['type' => 'success', 'message' => 'User created successfully.'];
+                        } else {
+                            $flash = ['type' => 'danger', 'message' => 'Could not create user: ' . $stmt->error];
+                        }
+                        $stmt->close();
+                    }
+                }
+            } else {
+                if (!$checkUnique($conn, 'email', $email, $targetUserId) || !$checkUnique($conn, 'username', $username, $targetUserId)) {
+                    // flash set
+                } else {
+                    $existingStmt = $conn->prepare('SELECT avatar_path FROM users WHERE userId = ? LIMIT 1');
+                    $existingStmt->bind_param('i', $targetUserId);
+                    $existingStmt->execute();
+                    $existingRow = $existingStmt->get_result()->fetch_assoc();
+                    $existingStmt->close();
+
+                    if (!$existingRow) {
+                        $flash = ['type' => 'danger', 'message' => 'User not found.'];
+                    } else {
+                        $currentAvatar = $existingRow['avatar_path'] ?? null;
+                        if (($avatarFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                            $av = app_store_avatar($avatarFile, $currentAvatar);
+                            if (!$av['success']) {
+                                $flash = ['type' => 'danger', 'message' => $av['message'] ?? 'Avatar upload failed.'];
+                            } else {
+                                $avatarPath = $av['path'];
+                            }
+                        }
+
+                        if ($flash === null) {
+                            if ($passwordPlain !== '') {
+                                if (strlen($passwordPlain) < 8) {
+                                    $flash = ['type' => 'danger', 'message' => 'Password must be at least 8 characters.'];
+                                } else {
+                                    $hash = password_hash($passwordPlain, PASSWORD_BCRYPT);
+                                    $storeParam = $storeName !== '' ? $storeName : null;
+                                    if ($avatarPath !== null) {
+                                        $stmt = $conn->prepare('
+                                            UPDATE users SET
+                                                first_name = ?, last_name = ?, username = ?, email = ?,
+                                                password_hash = ?, role = ?, seller_status = ?, store_name = ?, avatar_path = ?
+                                            WHERE userId = ?
+                                        ');
+                                        $stmt->bind_param(
+                                            'sssssssssi',
+                                            $firstName,
+                                            $lastName,
+                                            $username,
+                                            $email,
+                                            $hash,
+                                            $newRole,
+                                            $sellerStatus,
+                                            $storeParam,
+                                            $avatarPath,
+                                            $targetUserId
+                                        );
+                                    } else {
+                                        $stmt = $conn->prepare('
+                                            UPDATE users SET
+                                                first_name = ?, last_name = ?, username = ?, email = ?,
+                                                password_hash = ?, role = ?, seller_status = ?, store_name = ?
+                                            WHERE userId = ?
+                                        ');
+                                        $stmt->bind_param(
+                                            'ssssssssi',
+                                            $firstName,
+                                            $lastName,
+                                            $username,
+                                            $email,
+                                            $hash,
+                                            $newRole,
+                                            $sellerStatus,
+                                            $storeParam,
+                                            $targetUserId
+                                        );
+                                    }
+                                    $stmt->execute();
+                                    $stmt->close();
+                                    $flash = ['type' => 'success', 'message' => 'User updated successfully.'];
+                                }
+                            } else {
+                                $storeParam = $storeName !== '' ? $storeName : null;
+                                if ($avatarPath !== null) {
+                                    $stmt = $conn->prepare('
+                                        UPDATE users SET
+                                            first_name = ?, last_name = ?, username = ?, email = ?,
+                                            role = ?, seller_status = ?, store_name = ?, avatar_path = ?
+                                        WHERE userId = ?
+                                    ');
+                                    $stmt->bind_param(
+                                        'sssssssi',
+                                        $firstName,
+                                        $lastName,
+                                        $username,
+                                        $email,
+                                        $newRole,
+                                        $sellerStatus,
+                                        $storeParam,
+                                        $avatarPath,
+                                        $targetUserId
+                                    );
+                                } else {
+                                    $stmt = $conn->prepare('
+                                        UPDATE users SET
+                                            first_name = ?, last_name = ?, username = ?, email = ?,
+                                            role = ?, seller_status = ?, store_name = ?
+                                        WHERE userId = ?
+                                    ');
+                                    $stmt->bind_param(
+                                        'sssssssi',
+                                        $firstName,
+                                        $lastName,
+                                        $username,
+                                        $email,
+                                        $newRole,
+                                        $sellerStatus,
+                                        $storeParam,
+                                        $targetUserId
+                                    );
+                                }
+                                $stmt->execute();
+                                $stmt->close();
+                                $flash = ['type' => 'success', 'message' => 'User updated successfully.'];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Delete user (admin) ───────────────────────────────────────────────────
+    if ($action === 'delete_user' && app_is_admin($user)) {
+        $targetUserId = (int) ($_POST['user_id'] ?? 0);
+        if ($targetUserId <= 0) {
+            $flash = ['type' => 'danger', 'message' => 'Invalid user.'];
+        } elseif ($targetUserId === (int) $user['userId']) {
+            $flash = ['type' => 'danger', 'message' => 'You cannot delete your own account.'];
+        } else {
+            $ordStmt = $conn->prepare('SELECT COUNT(*) AS c FROM orders WHERE userId = ?');
+            $ordStmt->bind_param('i', $targetUserId);
+            $ordStmt->execute();
+            $orderCount = (int) ($ordStmt->get_result()->fetch_assoc()['c'] ?? 0);
+            $ordStmt->close();
+
+            $prodStmt = $conn->prepare('SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ?');
+            $prodStmt->bind_param('i', $targetUserId);
+            $prodStmt->execute();
+            $prodCount = (int) ($prodStmt->get_result()->fetch_assoc()['c'] ?? 0);
+            $prodStmt->close();
+
+            if ($orderCount > 0) {
+                $flash = ['type' => 'danger', 'message' => 'Cannot delete a user who has placed orders.'];
+            } elseif ($prodCount > 0) {
+                $flash = ['type' => 'danger', 'message' => 'Cannot delete a seller who still has product listings.'];
+            } else {
+                $stmt = $conn->prepare('SELECT avatar_path FROM users WHERE userId = ? LIMIT 1');
+                $stmt->bind_param('i', $targetUserId);
+                $stmt->execute();
+                $row = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if ($row) {
+                    $rt = $conn->prepare('DELETE FROM remember_tokens WHERE userId = ?');
+                    $rt->bind_param('i', $targetUserId);
+                    $rt->execute();
+                    $rt->close();
+
+                    $vt = $conn->prepare('DELETE FROM verification_tokens WHERE userId = ?');
+                    $vt->bind_param('i', $targetUserId);
+                    $vt->execute();
+                    $vt->close();
+
+                    if (app_table_exists($conn, 'seller_applications')) {
+                        $sa = $conn->prepare('DELETE FROM seller_applications WHERE userId = ?');
+                        $sa->bind_param('i', $targetUserId);
+                        $sa->execute();
+                        $sa->close();
+                    }
+
+                    $del = $conn->prepare('DELETE FROM users WHERE userId = ?');
+                    $del->bind_param('i', $targetUserId);
+                    if ($del->execute() && $del->affected_rows > 0) {
+                        if (!empty($row['avatar_path'])) {
+                            $oldPath = __DIR__ . '/../../' . ltrim($row['avatar_path'], '/');
+                            if (is_file($oldPath) && str_contains(str_replace('\\', '/', $oldPath), '/media/avatars/')) {
+                                @unlink($oldPath);
+                            }
+                        }
+                        $flash = ['type' => 'success', 'message' => 'User deleted.'];
+                    } else {
+                        $flash = ['type' => 'danger', 'message' => 'Could not delete user.'];
+                    }
+                    $del->close();
+                } else {
+                    $flash = ['type' => 'danger', 'message' => 'User not found.'];
+                }
+            }
+        }
+    }
+
     // ── Update order status ───────────────────────────────────────────────────
     if ($action === 'update_order_status' && ($role === 'seller' || $role === 'admin')) {
         $orderId         = (int) ($_POST['order_id'] ?? 0);

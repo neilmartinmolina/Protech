@@ -4,6 +4,7 @@
 /** @var array $pendingApplications */
 /** @var array $adminOrders */
 /** @var array $adminProducts */
+/** @var array $adminUsers */
 ?>
 <?php if ($tab === 'dashboard'): ?>
     <div class="row g-3 mb-4">
@@ -22,6 +23,93 @@
     <div class="row g-4">
         <div class="col-xl-7"><div class="panel-card chart-card"><h4>Orders in the Last 7 Days</h4><div class="chart-wrap"><canvas id="adminOrdersChart"></canvas></div></div></div>
         <div class="col-xl-5"><div class="panel-card chart-card"><h4>Order Status Breakdown</h4><div class="chart-wrap"><canvas id="adminStatusChart"></canvas></div></div></div>
+    </div>
+
+<?php elseif ($tab === 'users'): ?>
+    <div class="table-card">
+        <div class="table-card-header">
+            <h5>All Users <span class="badge-count"><?= count($adminUsers) ?></span></h5>
+            <button class="add-product-btn" type="button"
+                data-modal-target="#userModal"
+                data-modal-title="Add User"
+                data-modal-message="Create a new user account."
+                data-modal-confirm="Save User">
+                Add User
+            </button>
+        </div>
+        <div class="table-card-body table-responsive">
+            <?php if (!$adminUsers): ?>
+                <div class="p-4">No users found.</div>
+            <?php else: ?>
+                <table id="adminUsersTable" class="table table-sm w-100 mb-0">
+                    <thead>
+                        <tr>
+                            <th>Photo</th>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Seller status</th>
+                            <th>Store</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($adminUsers as $u): ?>
+                        <tr>
+                            <td class="admin-user-photo-cell">
+                                <?php if (!empty($u['avatar_path'])): ?>
+                                    <img src="<?= app_sanitize($u['avatar_path']) ?>" alt="" class="admin-user-thumb" width="40" height="40">
+                                <?php else: ?>
+                                    <div class="admin-user-thumb admin-user-thumb--placeholder" aria-hidden="true"><i class="fa-solid fa-user"></i></div>
+                                <?php endif; ?>
+                            </td>
+                            <td>#<?= (int) $u['userId'] ?></td>
+                            <td><?= app_sanitize(trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''))) ?></td>
+                            <td><?= app_sanitize($u['email'] ?? '') ?></td>
+                            <td><?= app_sanitize($u['username'] ?? '') ?></td>
+                            <td><span class="pill <?= app_sanitize($u['role'] === 'admin' ? 'admin' : ($u['role'] ?? '')) ?>"><?= app_sanitize(ucfirst($u['role'] ?? '')) ?></span></td>
+                            <td><?= app_sanitize($u['seller_status'] ?? '') ?></td>
+                            <td><?= app_sanitize($u['store_name'] ?? '') ?></td>
+                            <td><?= app_sanitize(isset($u['created_at']) ? date('M j, Y', strtotime($u['created_at'])) : '') ?></td>
+                            <td>
+                                <div class="action-stack">
+                                    <button class="edit-btn" type="button"
+                                        data-modal-target="#userModal"
+                                        data-modal-title="Edit User"
+                                        data-modal-message="Update this user account."
+                                        data-modal-confirm="Save User"
+                                        data-modal-payload='<?= app_sanitize(json_encode([
+                                            'user_id'       => (int) $u['userId'],
+                                            'first_name'    => $u['first_name'] ?? '',
+                                            'last_name'     => $u['last_name'] ?? '',
+                                            'username'      => $u['username'] ?? '',
+                                            'email'         => $u['email'] ?? '',
+                                            'role'          => $u['role'] ?? 'customer',
+                                            'seller_status' => $u['seller_status'] ?? 'not_applicable',
+                                            'store_name'    => $u['store_name'] ?? '',
+                                            'password'      => '',
+                                        ], JSON_UNESCAPED_UNICODE)) ?>'>
+                                        Edit
+                                    </button>
+                                    <button class="reject-btn" type="button"
+                                        data-modal-target="#deleteUserModal"
+                                        data-modal-title="Delete User"
+                                        data-modal-message="Permanently delete <?= app_sanitize($u['username'] ?? 'this user') ?>? This cannot be undone."
+                                        data-modal-confirm="Delete"
+                                        data-modal-payload='<?= app_sanitize(json_encode(['user_id' => (int) $u['userId']])) ?>'>
+                                        Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
     </div>
 
 <?php elseif ($tab === 'sellers'): ?>

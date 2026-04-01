@@ -46,6 +46,7 @@ $dashboardPayload = [
         ['selector' => '#adminOrdersTable',    'order' => [[6, 'desc']], 'disabledTargets' => [7], 'placeholder' => 'Search orders...'],
         ['selector' => '#sellerOrdersTable',   'order' => [[5, 'desc']], 'disabledTargets' => [6], 'placeholder' => 'Search orders...'],
         ['selector' => '#productsTable',       'order' => [[0, 'desc']], 'disabledTargets' => [],   'placeholder' => 'Search all products...'],
+        ['selector' => '#adminUsersTable',     'order' => [[1, 'desc']], 'disabledTargets' => [9], 'placeholder' => 'Search users...'],
     ],
 ];
 ?>
