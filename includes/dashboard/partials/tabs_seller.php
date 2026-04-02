@@ -4,6 +4,8 @@
 /** @var array $sellerStats */
 /** @var array $sellerProducts */
 /** @var array $sellerOrders */
+/** @var array $activityLogs */
+/** @var array $notifications */
 ?>
 <?php if ($tab === 'dashboard'): ?>
     <div class="row g-3 mb-4">
@@ -52,9 +54,7 @@
                                     data-modal-title="Edit Product"
                                     data-modal-message="Update this product."
                                     data-modal-confirm="Save Product"
-                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'save_product', 'product_id' => (int) $product['productId'], 'name' => $product['name'], 'brand' => $product['brand'], 'category' => $product['category'], 'description' => $product['description'], 'price' => $product['price'], 'stock' => (int) $product['stock'], 'icon_class' => $product['icon_class'], 'is_active' => (int) $product['is_active']])) ?>'>
-                                    Edit
-                                </button>
+                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'save_product', 'product_id' => (int) $product['productId'], 'name' => $product['name'], 'brand' => $product['brand'], 'category' => $product['category'], 'description' => $product['description'], 'price' => $product['price'], 'stock' => (int) $product['stock'], 'icon_class' => $product['icon_class'], 'is_active' => (int) $product['is_active']])) ?>'>Edit</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -88,9 +88,7 @@
                                     data-modal-title="Update Order Status"
                                     data-modal-message="Change the status for order #<?= (int) $order['orderId'] ?>."
                                     data-modal-confirm="Save Status"
-                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>
-                                    Update
-                                </button>
+                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>Update</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -105,6 +103,12 @@
         <div class="col-xl-7"><div class="panel-card chart-card"><h4>Revenue Trend</h4><div class="chart-wrap"><canvas id="sellerRevenueChartAnalytics"></canvas></div></div></div>
         <div class="col-xl-5"><div class="panel-card chart-card"><h4>Category Mix</h4><div class="chart-wrap"><canvas id="sellerCategoryChartAnalytics"></canvas></div></div></div>
     </div>
+
+<?php elseif ($tab === 'notifications'): ?>
+    <?php include __DIR__ . '/tab_notifications.php'; ?>
+
+<?php elseif ($tab === 'activity_logs'): ?>
+    <?php include __DIR__ . '/tab_activity_logs.php'; ?>
 
 <?php else: ?>
     <div class="panel-card"><h4><?= app_sanitize($allowedTabs[$tab][0]) ?></h4><p class="mb-0">This section is ready for additional tools.</p></div>

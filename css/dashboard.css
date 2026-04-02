@@ -237,3 +237,99 @@
 #productModal .modal-dialog {
     max-width: min(900px, 95vw);
 }
+
+/* ============================================================
+   Notifications & Activity Logs — add to dashboard.css
+   ============================================================ */
+
+/* --- Notification list ------------------------------------ */
+.notif-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+    transition: background .15s;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item--unread {
+    background: rgba(var(--primary-rgb, 99, 102, 241), .06);
+}
+
+.notif-item--unread .notif-dot {
+    background: var(--primary, #6366f1);
+}
+
+.notif-dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, .25);
+    margin-top: .35rem;
+}
+
+.notif-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--text-primary, #f1f5f9);
+    margin-bottom: .2rem;
+}
+
+.notif-text {
+    font-size: .83rem;
+    color: var(--text-muted, #94a3b8);
+    line-height: 1.45;
+}
+
+.notif-link {
+    display: inline-block;
+    margin-top: .35rem;
+    font-size: .8rem;
+    color: var(--primary, #6366f1);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.notif-link:hover {
+    text-decoration: underline;
+}
+
+.notif-time {
+    flex-shrink: 0;
+    font-size: .75rem;
+    color: var(--text-muted, #64748b);
+    white-space: nowrap;
+    padding-top: .15rem;
+}
+
+/* --- Activity log table tweaks ---------------------------- */
+#activityLogsTable code {
+    background: rgba(255, 255, 255, .07);
+    border-radius: 4px;
+    padding: .1rem .35rem;
+    color: #93c5fd;          /* light blue — readable on dark panels */
+    font-size: .78rem;
+}
+
+/* Pill overrides for entity types that don't map to existing status names */
+.pill.product  { background: rgba(59, 130, 246, .15); color: #93c5fd; }
+.pill.order    { background: rgba(16, 185, 129, .15); color: #6ee7b7; }
+.pill.user     { background: rgba(139, 92, 246, .15); color: #c4b5fd; }
+.pill.seller_application { background: rgba(245, 158, 11, .15); color: #fcd34d; }

@@ -5,6 +5,8 @@
 /** @var array $adminOrders */
 /** @var array $adminProducts */
 /** @var array $adminUsers */
+/** @var array $activityLogs */
+/** @var array $notifications */
 ?>
 <?php if ($tab === 'dashboard'): ?>
     <div class="row g-3 mb-4">
@@ -44,16 +46,8 @@
                 <table id="adminUsersTable" class="table table-sm w-100 mb-0">
                     <thead>
                         <tr>
-                            <th>Photo</th>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Username</th>
-                            <th>Role</th>
-                            <th>Seller status</th>
-                            <th>Store</th>
-                            <th>Joined</th>
-                            <th>Actions</th>
+                            <th>Photo</th><th>ID</th><th>Name</th><th>Email</th><th>Username</th>
+                            <th>Role</th><th>Seller status</th><th>Store</th><th>Joined</th><th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -91,17 +85,13 @@
                                             'seller_status' => $u['seller_status'] ?? 'not_applicable',
                                             'store_name'    => $u['store_name'] ?? '',
                                             'password'      => '',
-                                        ], JSON_UNESCAPED_UNICODE)) ?>'>
-                                        Edit
-                                    </button>
+                                        ], JSON_UNESCAPED_UNICODE)) ?>'>Edit</button>
                                     <button class="reject-btn" type="button"
                                         data-modal-target="#deleteUserModal"
                                         data-modal-title="Delete User"
                                         data-modal-message="Permanently delete <?= app_sanitize($u['username'] ?? 'this user') ?>? This cannot be undone."
                                         data-modal-confirm="Delete"
-                                        data-modal-payload='<?= app_sanitize(json_encode(['user_id' => (int) $u['userId']])) ?>'>
-                                        Delete
-                                    </button>
+                                        data-modal-payload='<?= app_sanitize(json_encode(['user_id' => (int) $u['userId']])) ?>'>Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -122,18 +112,7 @@
                 <div class="p-4 text-secondary">No pending seller applications. You're all caught up.</div>
             <?php else: ?>
                 <table id="sellerRequestsTable" class="table table-sm w-100 mb-0">
-                    <thead>
-                        <tr>
-                            <th>Applicant</th>
-                            <th>Store Name</th>
-                            <th>Email</th>
-                            <th>Username</th>
-                            <th>Reason</th>
-                            <th>Applied</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Applicant</th><th>Store Name</th><th>Email</th><th>Username</th><th>Reason</th><th>Applied</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>
                     <?php foreach ($pendingApplications as $app): ?>
                         <tr>
@@ -157,17 +136,13 @@
                                         data-modal-title="Approve Seller Application"
                                         data-modal-message="Approve <?= app_sanitize($app['first_name'] . ' ' . $app['last_name']) ?> for store <?= app_sanitize($app['store_name']) ?>? Their account will be promoted to seller and they'll receive a notification email."
                                         data-modal-confirm="Approve"
-                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'approve_seller', 'application_id' => (int) $app['app_id']])) ?>'>
-                                        Approve
-                                    </button>
+                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'approve_seller', 'application_id' => (int) $app['app_id']])) ?>'>Approve</button>
                                     <button class="reject-btn" type="button"
                                         data-modal-target="#rejectSellerModal"
                                         data-modal-title="Reject Application"
                                         data-modal-message="Reject <?= app_sanitize($app['first_name'] . ' ' . $app['last_name']) ?>'s application for <?= app_sanitize($app['store_name']) ?>? You can provide a reason — the applicant will be notified and may resubmit."
                                         data-modal-confirm="Reject Application"
-                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'reject_seller', 'application_id' => (int) $app['app_id']])) ?>'>
-                                        Reject
-                                    </button>
+                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'reject_seller', 'application_id' => (int) $app['app_id']])) ?>'>Reject</button>
                                 </div>
                             </td>
                         </tr>
@@ -203,9 +178,7 @@
                                     data-modal-title="Update Order Status"
                                     data-modal-message="Change the status for order #<?= (int) $order['orderId'] ?>."
                                     data-modal-confirm="Save Status"
-                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>
-                                    Update
-                                </button>
+                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>Update</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -242,6 +215,12 @@
             <?php endif; ?>
         </div>
     </div>
+
+<?php elseif ($tab === 'notifications'): ?>
+    <?php include __DIR__ . '/tab_notifications.php'; ?>
+
+<?php elseif ($tab === 'activity_logs'): ?>
+    <?php include __DIR__ . '/tab_activity_logs.php'; ?>
 
 <?php else: ?>
     <div class="panel-card"><h4>General</h4><p class="mb-0">Admin account tools can be extended here.</p></div>

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/activity_log.php';
 
 function app_db(): mysqli
 {

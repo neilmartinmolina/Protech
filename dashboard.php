@@ -41,6 +41,7 @@ $dashboardPayload = [
     'sellerCategoryLabels'   => array_keys($sellerCategoryCounts),
     'sellerCategoryData'     => array_values($sellerCategoryCounts),
     'dataTables'             => [
+        ['selector' => '#activityLogsTable', 'order' => [[0, 'desc']], 'disabledTargets' => [], 'placeholder' => 'Search logs...'],
         ['selector' => '#sellerRequestsTable', 'order' => [[5, 'asc']], 'disabledTargets' => [6, 7], 'placeholder' => 'Search applications...'],
         ['selector' => '#sellerProductsTable', 'order' => [[0, 'desc']], 'disabledTargets' => [7], 'placeholder' => 'Search products...'],
         ['selector' => '#adminOrdersTable',    'order' => [[6, 'desc']], 'disabledTargets' => [7], 'placeholder' => 'Search orders...'],

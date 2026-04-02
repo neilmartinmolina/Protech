@@ -608,3 +608,43 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
     return ['flash' => $flash, 'user' => $user, 'role' => $role];
 }
+
+// After approving a seller:
+app_log_activity($conn, $adminUserId, 'seller.approved',
+    "Seller application #{$appId} approved for store '{$storeName}'.", [
+    'entity_type' => 'seller_application',
+    'entity_id'   => $appId,
+    'severity'    => 'info',
+    'context'     => ['store_name' => $storeName, 'seller_id' => $sellerId],
+    'notify'      => [
+        $sellerId => [
+            'title' => 'Your seller application was approved!',
+            'body'  => "Congratulations — {$storeName} is now live on ProTech.",
+            'link'  => 'dashboard.php?tab=dashboard',
+        ],
+    ],
+]);
+
+// After a seller saves a product:
+app_log_activity($conn, $sellerUserId, 'product.created',
+    "Product '{$name}' created.", [
+    'entity_type' => 'product',
+    'entity_id'   => $productId,
+    'context'     => ['name' => $name, 'price' => $price],
+]);
+
+// After an order status change:
+app_log_activity($conn, $actorUserId, 'order.status_changed',
+    "Order #{$orderId} status changed from '{$oldStatus}' to '{$newStatus}'.", [
+    'entity_type' => 'order',
+    'entity_id'   => $orderId,
+    'severity'    => 'info',
+    'context'     => ['old_status' => $oldStatus, 'new_status' => $newStatus],
+    'notify'      => [
+        $customerUserId => [
+            'title' => "Your order #{$orderId} has been updated",
+            'body'  => "Status changed to: " . ucfirst($newStatus),
+            'link'  => 'dashboard.php?tab=orders',
+        ],
+    ],
+]);

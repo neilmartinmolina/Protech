@@ -5,6 +5,7 @@
 /** @var string $tab */
 /** @var string $avatarUrl */
 /** @var array $adminStats */
+/** @var int $unreadCount */
 ?>
 <aside class="admin-sidebar" id="sidebar">
     <a href="index.php" class="sidebar-brand">
@@ -18,8 +19,15 @@
             <li>
                 <a href="dashboard.php?tab=<?= app_sanitize($key) ?>" class="nav-link <?= $tab === $key ? 'active' : '' ?>">
                     <i class="<?= app_sanitize($icon) ?>"></i> <?= app_sanitize($label) ?>
+
                     <?php if ($key === 'sellers' && ($adminStats['pending_sellers'] ?? 0) > 0): ?>
-                        <span class="badge bg-warning text-dark ms-auto" style="font-size:.65rem;"><?= (int) $adminStats['pending_sellers'] ?></span>
+                        <span class="badge bg-warning text-dark ms-auto" style="font-size:.65rem;">
+                            <?= (int) $adminStats['pending_sellers'] ?>
+                        </span>
+                    <?php elseif ($key === 'notifications' && ($unreadCount ?? 0) > 0): ?>
+                        <span class="badge bg-danger ms-auto" style="font-size:.65rem;">
+                            <?= (int) $unreadCount ?>
+                        </span>
                     <?php endif; ?>
                 </a>
             </li>
@@ -35,7 +43,6 @@
     </ul>
     <?php endif; ?>
 
-    <div class="sidebar-footer">
     <div class="sidebar-footer">
         <div class="dropdown">
             <a href="#" class="user-card dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
