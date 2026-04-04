@@ -87,7 +87,7 @@ $pageCssExt = [];
                                     </li>
                                     <li>
                                         <strong>Language</strong>
-                                        <span>: Bisaya, English</span>
+                                        <span>: English</span>
                                     </li>
                                     <li>
                                         <strong>Freelance</strong>
@@ -104,7 +104,7 @@ $pageCssExt = [];
                                        class="dev-social-btn" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
                                         <i class="fa-brands fa-instagram"></i>
                                     </a>
-                                    <a href="https://github.com/blwncttn"
+                                    <a href="https://github.com/neilmartinmolina"
                                        class="dev-social-btn" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
                                         <i class="fa-brands fa-github"></i>
                                     </a>

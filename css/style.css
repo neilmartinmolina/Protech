@@ -736,12 +736,17 @@ body.modal-open {
     position: relative;
     z-index: 1;
     width: min(92vw, 520px);
-    margin: 10vh auto 0;
+    margin: 5vh auto;          /* symmetric top+bottom margin */
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    overflow: hidden;
+    overflow: hidden;          /* REMOVE this line */
+
+    /* ADD these three */
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
 }
 
 .app-modal__header,
@@ -780,6 +785,8 @@ body.modal-open {
 
 .app-modal__body {
     padding: 1.25rem;
+    overflow-y: auto;   /* ADD */
+    min-height: 0;      /* ADD */
 }
 
 .app-modal__message {

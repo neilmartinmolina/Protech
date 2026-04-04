@@ -233,8 +233,26 @@
     }
 }
 
-/* ── Product modal — wider ────────────────────────────────────────── */
-#productModal .modal-dialog {
+/* ── App Modal — base layout ──────────────────────────────── */
+.app-modal__dialog {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;        /* cap the dialog height */
+}
+
+.app-modal__header,
+.app-modal__footer {
+    flex-shrink: 0;          /* never shrink — always visible */
+}
+
+.app-modal__body {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;           /* critical flex fix */
+}
+
+/* ── Product modal — wider ────────────────────────────────── */
+#productModal .app-modal__dialog {       
     max-width: min(900px, 95vw);
 }
 

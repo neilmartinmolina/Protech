@@ -5,6 +5,11 @@ declare(strict_types=1);
 use PHPMailer\PHPMailer\Exception;
 
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/../../app.php';
+
+if (!function_exists('app_log_activity')) {
+    die('app_log_activity is NOT loaded. Check app.php require path.');
+}
 
 /**
  * Handle dashboard POST actions. Returns updated user, role, and optional flash message.
@@ -64,6 +69,20 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                 $stmt->close();
 
                 $conn->commit();
+                app_log_activity($conn, $reviewerId, 'seller.approved',
+                    "Seller application #{$applicationId} approved for store '{$storeName}'.", [
+                    'entity_type' => 'seller_application',
+                    'entity_id'   => $applicationId,
+                    'severity'    => 'info',
+                    'context'     => ['store_name' => $storeName, 'seller_id' => $userId],
+                    'notify'      => [
+                        $userId => [
+                            'title' => 'Your seller application was approved!',
+                            'body'  => "Congratulations — {$storeName} is now live on ProTech.",
+                            'link'  => 'dashboard.php?tab=dashboard',
+                        ],
+                    ],
+                ]);
 
                 try {
                     $mail = dashboard_mailer();
@@ -138,6 +157,14 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
                 $conn->commit();
 
+                app_log_activity($conn, $reviewerId, 'seller.rejected',
+                    "Seller application #{$applicationId} rejected.", [
+                    'entity_type' => 'seller_application',
+                    'entity_id'   => $applicationId,
+                    'severity'    => 'warning',
+                    'context'     => ['store_name' => $application['store_name'], 'reason' => $rejectionReason],
+                ]);
+
                 try {
                     $mail = dashboard_mailer();
                     $mail->addAddress($application['email'], $application['first_name'] . ' ' . $application['last_name']);
@@ -179,6 +206,17 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
     if ($action === 'save_product' && ($role === 'seller' || $role === 'admin')) {
         $result = app_upsert_product($user, $_POST);
         $flash  = ['type' => $result['success'] ? 'success' : 'danger', 'message' => $result['message']];
+
+        if ($result['success']) {
+            $productId = (int) ($result['product_id'] ?? 0);
+            $isNew     = empty($_POST['product_id']);
+            app_log_activity($conn, (int) $user['userId'], $isNew ? 'product.created' : 'product.updated',
+                ($isNew ? 'Created' : 'Updated') . " product '{$_POST['name']}'.", [
+                'entity_type' => 'product',
+                'entity_id'   => $productId,
+                'context'     => ['name' => $_POST['name'] ?? '', 'price' => $_POST['price'] ?? ''],
+            ]);
+        }
 
         if ($result['success'] && !empty($_FILES['product_images']['name'][0])) {
             $productId   = (int) ($result['product_id'] ?? 0);
@@ -470,7 +508,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                         WHERE userId = ?
                                     ');
                                     $stmt->bind_param(
-                                        'sssssssi',
+                                        'ssssssi',
                                         $firstName,
                                         $lastName,
                                         $username,
@@ -582,6 +620,14 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
         if (!in_array($status, $allowedStatuses, true)) {
             $flash = ['type' => 'danger', 'message' => 'Invalid order status selected.'];
         } else {
+            // Grab old status before overwriting
+            $prev = $conn->prepare('SELECT status FROM orders WHERE orderId = ? LIMIT 1');
+            $prev->bind_param('i', $orderId);
+            $prev->execute();
+            $prevRow   = $prev->get_result()->fetch_assoc();
+            $prev->close();
+            $oldStatus = $prevRow['status'] ?? '';
+
             if ($role === 'seller') {
                 $stmt = $conn->prepare('
                     UPDATE orders o
@@ -597,9 +643,19 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
             $stmt->execute();
             $affected = $stmt->affected_rows;
             $stmt->close();
-            $flash = $affected
-                ? ['type' => 'success', 'message' => 'Order status updated successfully.']
-                : ['type' => 'danger',  'message' => 'Order not found or not allowed.'];
+
+            if ($affected) {
+                app_log_activity($conn, (int) $user['userId'], 'order.status_changed',
+                    "Order #{$orderId} status changed from '{$oldStatus}' to '{$status}'.", [
+                    'entity_type' => 'order',
+                    'entity_id'   => $orderId,
+                    'severity'    => 'info',
+                    'context'     => ['old_status' => $oldStatus, 'new_status' => $status],
+                ]);
+                $flash = ['type' => 'success', 'message' => 'Order status updated successfully.'];
+            } else {
+                $flash = ['type' => 'danger', 'message' => 'Order not found or not allowed.'];
+            }
         }
     }
 
@@ -608,43 +664,3 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
     return ['flash' => $flash, 'user' => $user, 'role' => $role];
 }
-
-// After approving a seller:
-app_log_activity($conn, $adminUserId, 'seller.approved',
-    "Seller application #{$appId} approved for store '{$storeName}'.", [
-    'entity_type' => 'seller_application',
-    'entity_id'   => $appId,
-    'severity'    => 'info',
-    'context'     => ['store_name' => $storeName, 'seller_id' => $sellerId],
-    'notify'      => [
-        $sellerId => [
-            'title' => 'Your seller application was approved!',
-            'body'  => "Congratulations — {$storeName} is now live on ProTech.",
-            'link'  => 'dashboard.php?tab=dashboard',
-        ],
-    ],
-]);
-
-// After a seller saves a product:
-app_log_activity($conn, $sellerUserId, 'product.created',
-    "Product '{$name}' created.", [
-    'entity_type' => 'product',
-    'entity_id'   => $productId,
-    'context'     => ['name' => $name, 'price' => $price],
-]);
-
-// After an order status change:
-app_log_activity($conn, $actorUserId, 'order.status_changed',
-    "Order #{$orderId} status changed from '{$oldStatus}' to '{$newStatus}'.", [
-    'entity_type' => 'order',
-    'entity_id'   => $orderId,
-    'severity'    => 'info',
-    'context'     => ['old_status' => $oldStatus, 'new_status' => $newStatus],
-    'notify'      => [
-        $customerUserId => [
-            'title' => "Your order #{$orderId} has been updated",
-            'body'  => "Status changed to: " . ucfirst($newStatus),
-            'link'  => 'dashboard.php?tab=orders',
-        ],
-    ],
-]);
