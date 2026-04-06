@@ -69,6 +69,20 @@ $dummyHash   = password_hash('dummy_' . random_bytes(8), PASSWORD_BCRYPT);
 $hashToCheck = $user ? $user['password_hash'] : $dummyHash;
 
 if (!$user || !password_verify($password, $hashToCheck)) {
+    // Only log if the user actually exists — avoids polluting logs with
+    // enumeration probes against nonexistent accounts
+    if ($user) {
+        app_log_activity($conn, (int) $user['userId'], 'user.login_failed',
+            "Failed login attempt for '{$identifier}' from {$ip}.", [
+            'entity_type' => 'user',
+            'entity_id'   => (int) $user['userId'],
+            'severity'    => 'warning',
+            'context'     => [
+                'identifier' => $identifier,
+                'ip'         => $ip,
+            ],
+        ]);
+    }
     echo json_encode(['success' => false, 'message' => 'Invalid email/username or password.']);
     exit;
 }
@@ -165,6 +179,18 @@ if ($rememberMe) {
         'samesite' => 'Lax',
     ]);
 }
+
+// ── Log successful login ──────────────────────────────────────────────────
+app_log_activity($conn, (int) $user['userId'], 'user.login',
+    "User '{$user['username']}' logged in from {$ip}.", [
+    'entity_type' => 'user',
+    'entity_id'   => (int) $user['userId'],
+    'severity'    => 'info',
+    'context'     => [
+        'ip'         => $ip,
+        'remember_me' => $rememberMe,
+    ],
+]);
 
 echo json_encode([
     'success'  => true,

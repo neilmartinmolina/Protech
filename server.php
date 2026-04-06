@@ -151,6 +151,22 @@ try {
     $stmt->close();
     $conn->commit();
 
+    // ── Log registration ──────────────────────────────────────────────────────
+    app_log_activity($conn, $userId, 'user.registered',
+    "New {$role} account registered: '{$username}' ({$email}).", [
+    'entity_type' => 'user',
+    'entity_id'   => $userId,
+    'severity'    => 'info',
+    'context'     => [
+        'username'      => $username,
+        'email'         => $email,
+        'role'          => $role,
+        'seller_status' => $sellerStatus,
+        'store_name'    => $role === 'seller' ? $storeName : null,
+        'ip'            => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
+    ],
+    ]);
+
 } catch (Throwable $e) {
     $conn->rollback();
     error_log('Signup transaction failed: ' . $e->getMessage());

@@ -284,15 +284,15 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
     // ── Save user (admin) ─────────────────────────────────────────────────────
     if ($action === 'save_user' && app_is_admin($user)) {
-        $targetUserId   = (int) ($_POST['user_id'] ?? 0);
-        $firstName      = trim($_POST['first_name'] ?? '');
-        $lastName       = trim($_POST['last_name'] ?? '');
-        $username       = trim($_POST['username'] ?? '');
-        $email          = trim($_POST['email'] ?? '');
-        $newRole        = trim($_POST['role'] ?? 'customer');
-        $sellerStatus   = trim($_POST['seller_status'] ?? 'not_applicable');
-        $storeName      = trim($_POST['store_name'] ?? '');
-        $passwordPlain  = (string) ($_POST['password'] ?? '');
+        $targetUserId  = (int) ($_POST['user_id'] ?? 0);
+        $firstName     = trim($_POST['first_name'] ?? '');
+        $lastName      = trim($_POST['last_name']  ?? '');
+        $username      = trim($_POST['username']   ?? '');
+        $email         = trim($_POST['email']      ?? '');
+        $newRole       = trim($_POST['role']       ?? 'customer');
+        $sellerStatus  = trim($_POST['seller_status'] ?? 'not_applicable');
+        $storeName     = trim($_POST['store_name'] ?? '');
+        $passwordPlain = (string) ($_POST['password'] ?? '');
 
         $allowedRoles  = ['customer', 'seller', 'admin'];
         $allowedSeller = ['not_applicable', 'pending', 'approved', 'rejected'];
@@ -319,9 +319,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
             $checkUnique = static function (mysqli $c, string $field, string $value, int $excludeId) use (&$flash): bool {
                 $stmt = $c->prepare("SELECT userId FROM users WHERE {$field} = ? AND userId != ? LIMIT 1");
-                if (!$stmt) {
-                    return false;
-                }
+                if (!$stmt) return false;
                 $stmt->bind_param('si', $value, $excludeId);
                 $stmt->execute();
                 $exists = (bool) $stmt->get_result()->fetch_assoc();
@@ -333,35 +331,28 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                 return true;
             };
 
-            $upsertSellerApplication = static function (mysqli $c, int $uid, string $status, string $store, int $adminId) : void {
-                if ($store === '' || !app_table_exists($c, 'seller_applications')) {
-                    return;
-                }
-                $appStatus = $status === 'approved'
-                    ? 'approved'
-                    : ($status === 'rejected' ? 'rejected' : 'pending');
-
+            $upsertSellerApplication = static function (mysqli $c, int $uid, string $status, string $store, int $adminId): void {
+                if ($store === '' || !app_table_exists($c, 'seller_applications')) return;
+                $appStatus = match($status) {
+                    'approved' => 'approved',
+                    'rejected' => 'rejected',
+                    default    => 'pending',
+                };
                 if ($appStatus === 'pending') {
-                    $stmt = $c->prepare("
-                        INSERT INTO seller_applications (userId, store_name, reason, status, created_at)
-                        VALUES (?, ?, NULL, 'pending', NOW())
-                    ");
+                    $stmt = $c->prepare("INSERT INTO seller_applications (userId, store_name, reason, status, created_at) VALUES (?, ?, NULL, 'pending', NOW())");
                     $stmt->bind_param('is', $uid, $store);
                     $stmt->execute();
                     $stmt->close();
                     return;
                 }
-
-                $stmt = $c->prepare("
-                    INSERT INTO seller_applications (userId, store_name, reason, status, reviewedByUserId, reviewed_at, created_at)
-                    VALUES (?, ?, NULL, ?, ?, NOW(), NOW())
-                ");
+                $stmt = $c->prepare("INSERT INTO seller_applications (userId, store_name, reason, status, reviewedByUserId, reviewed_at, created_at) VALUES (?, ?, NULL, ?, ?, NOW(), NOW())");
                 $stmt->bind_param('issi', $uid, $store, $appStatus, $adminId);
                 $stmt->execute();
                 $stmt->close();
             };
 
             if ($targetUserId === 0) {
+                // ── CREATE new user ───────────────────────────────────────────
                 if (strlen($passwordPlain) < 8) {
                     $flash = ['type' => 'danger', 'message' => 'Password must be at least 8 characters for new users.'];
                 } elseif (!$checkUnique($conn, 'email', $email, 0) || !$checkUnique($conn, 'username', $username, 0)) {
@@ -380,26 +371,28 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                         $stmt = $conn->prepare('
                             INSERT INTO users
                                 (first_name, last_name, username, email, password_hash,
-                                 role, seller_status, avatar_path, is_verified, created_at)
+                                role, seller_status, avatar_path, is_verified, created_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
                         ');
-                        $avatarIns  = $avatarPath;
-                        $stmt->bind_param(
-                            'ssssssss',
-                            $firstName,
-                            $lastName,
-                            $username,
-                            $email,
-                            $hash,
-                            $newRole,
-                            $sellerStatus,
-                            $avatarIns
-                        );
+                        $avatarIns = $avatarPath;
+                        $stmt->bind_param('ssssssss', $firstName, $lastName, $username, $email, $hash, $newRole, $sellerStatus, $avatarIns);
                         if ($stmt->execute()) {
                             $newUserId = (int) $conn->insert_id;
                             if ($newRole === 'seller') {
                                 $upsertSellerApplication($conn, $newUserId, $sellerStatus, $storeName, $reviewerId);
                             }
+                            app_log_activity($conn, $reviewerId, 'user.created',
+                                "Admin created user '{$username}' (#{$newUserId}) with role '{$newRole}'.", [
+                                'entity_type' => 'user',
+                                'entity_id'   => $newUserId,
+                                'severity'    => 'info',
+                                'context'     => [
+                                    'username'      => $username,
+                                    'email'         => $email,
+                                    'role'          => $newRole,
+                                    'seller_status' => $sellerStatus,
+                                ],
+                            ]);
                             $flash = ['type' => 'success', 'message' => 'User created successfully.'];
                         } else {
                             $flash = ['type' => 'danger', 'message' => 'Could not create user: ' . $stmt->error];
@@ -408,10 +401,12 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                     }
                 }
             } else {
+                // ── UPDATE existing user ──────────────────────────────────────
                 if (!$checkUnique($conn, 'email', $email, $targetUserId) || !$checkUnique($conn, 'username', $username, $targetUserId)) {
-                    // flash set
+                    // flash set inside
                 } else {
-                    $existingStmt = $conn->prepare('SELECT avatar_path FROM users WHERE userId = ? LIMIT 1');
+                    // Fetch current state for diffing
+                    $existingStmt = $conn->prepare('SELECT first_name, last_name, username, email, role, seller_status, avatar_path FROM users WHERE userId = ? LIMIT 1');
                     $existingStmt->bind_param('i', $targetUserId);
                     $existingStmt->execute();
                     $existingRow = $existingStmt->get_result()->fetch_assoc();
@@ -421,6 +416,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                         $flash = ['type' => 'danger', 'message' => 'User not found.'];
                     } else {
                         $currentAvatar = $existingRow['avatar_path'] ?? null;
+
                         if (($avatarFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
                             $av = app_store_avatar($avatarFile, $currentAvatar);
                             if (!$av['success']) {
@@ -431,98 +427,121 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                         }
 
                         if ($flash === null) {
+                            $passwordChanged = false;
+
                             if ($passwordPlain !== '') {
                                 if (strlen($passwordPlain) < 8) {
                                     $flash = ['type' => 'danger', 'message' => 'Password must be at least 8 characters.'];
                                 } else {
-                                    $hash = password_hash($passwordPlain, PASSWORD_BCRYPT);
-                                    if ($avatarPath !== null) {
-                                        $stmt = $conn->prepare('
-                                            UPDATE users SET
-                                                first_name = ?, last_name = ?, username = ?, email = ?,
-                                                password_hash = ?, role = ?, seller_status = ?, avatar_path = ?
-                                            WHERE userId = ?
-                                        ');
-                                        $stmt->bind_param(
-                                            'ssssssssi',
-                                            $firstName,
-                                            $lastName,
-                                            $username,
-                                            $email,
-                                            $hash,
-                                            $newRole,
-                                            $sellerStatus,
-                                            $avatarPath,
-                                            $targetUserId
-                                        );
-                                    } else {
-                                        $stmt = $conn->prepare('
-                                            UPDATE users SET
-                                                first_name = ?, last_name = ?, username = ?, email = ?,
-                                                password_hash = ?, role = ?, seller_status = ?
-                                            WHERE userId = ?
-                                        ');
-                                        $stmt->bind_param(
-                                            'sssssssi',
-                                            $firstName,
-                                            $lastName,
-                                            $username,
-                                            $email,
-                                            $hash,
-                                            $newRole,
-                                            $sellerStatus,
-                                            $targetUserId
-                                        );
-                                    }
-                                    $stmt->execute();
-                                    $stmt->close();
-                                    if ($newRole === 'seller') {
-                                        $upsertSellerApplication($conn, $targetUserId, $sellerStatus, $storeName, $reviewerId);
-                                    }
-                                    $flash = ['type' => 'success', 'message' => 'User updated successfully.'];
+                                    $hash            = password_hash($passwordPlain, PASSWORD_BCRYPT);
+                                    $passwordChanged = true;
                                 }
-                            } else {
-                                if ($avatarPath !== null) {
-                                    $stmt = $conn->prepare('
-                                        UPDATE users SET
-                                            first_name = ?, last_name = ?, username = ?, email = ?,
-                                            role = ?, seller_status = ?, avatar_path = ?
-                                        WHERE userId = ?
-                                    ');
-                                    $stmt->bind_param(
-                                        'sssssssi',
-                                        $firstName,
-                                        $lastName,
-                                        $username,
-                                        $email,
-                                        $newRole,
-                                        $sellerStatus,
-                                        $avatarPath,
-                                        $targetUserId
-                                    );
+                            }
+
+                            if ($flash === null) {
+                                if ($passwordChanged) {
+                                    if ($avatarPath !== null) {
+                                        $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, email=?, password_hash=?, role=?, seller_status=?, avatar_path=? WHERE userId=?');
+                                        $stmt->bind_param('ssssssssi', $firstName, $lastName, $username, $email, $hash, $newRole, $sellerStatus, $avatarPath, $targetUserId);
+                                    } else {
+                                        $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, email=?, password_hash=?, role=?, seller_status=? WHERE userId=?');
+                                        $stmt->bind_param('sssssssi', $firstName, $lastName, $username, $email, $hash, $newRole, $sellerStatus, $targetUserId);
+                                    }
                                 } else {
-                                    $stmt = $conn->prepare('
-                                        UPDATE users SET
-                                            first_name = ?, last_name = ?, username = ?, email = ?,
-                                            role = ?, seller_status = ?
-                                        WHERE userId = ?
-                                    ');
-                                    $stmt->bind_param(
-                                        'ssssssi',
-                                        $firstName,
-                                        $lastName,
-                                        $username,
-                                        $email,
-                                        $newRole,
-                                        $sellerStatus,
-                                        $targetUserId
-                                    );
+                                    if ($avatarPath !== null) {
+                                        $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, email=?, role=?, seller_status=?, avatar_path=? WHERE userId=?');
+                                        $stmt->bind_param('ssssssi', $firstName, $lastName, $username, $email, $newRole, $sellerStatus, $avatarPath, $targetUserId);
+                                    } else {
+                                        $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, email=?, role=?, seller_status=? WHERE userId=?');
+                                        $stmt->bind_param('sssssi', $firstName, $lastName, $username, $email, $newRole, $sellerStatus, $targetUserId);
+                                    }
                                 }
                                 $stmt->execute();
                                 $stmt->close();
+
                                 if ($newRole === 'seller') {
                                     $upsertSellerApplication($conn, $targetUserId, $sellerStatus, $storeName, $reviewerId);
                                 }
+
+                                // ── Build change diff and emit targeted log entries ──
+                                $changes = [];
+
+                                if ($existingRow['username'] !== $username) {
+                                    $changes['username'] = ['from' => $existingRow['username'], 'to' => $username];
+                                    app_log_activity($conn, $reviewerId, 'user.username_changed',
+                                        "Admin changed username for user #{$targetUserId} from '{$existingRow['username']}' to '{$username}'.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'warning',
+                                        'context'     => ['from' => $existingRow['username'], 'to' => $username],
+                                    ]);
+                                }
+
+                                if ($existingRow['email'] !== $email) {
+                                    $changes['email'] = ['from' => $existingRow['email'], 'to' => $email];
+                                    app_log_activity($conn, $reviewerId, 'user.email_changed',
+                                        "Admin changed email for user #{$targetUserId} from '{$existingRow['email']}' to '{$email}'.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'warning',
+                                        'context'     => ['from' => $existingRow['email'], 'to' => $email],
+                                    ]);
+                                }
+
+                                if ($existingRow['role'] !== $newRole) {
+                                    $changes['role'] = ['from' => $existingRow['role'], 'to' => $newRole];
+                                    app_log_activity($conn, $reviewerId, 'user.role_changed',
+                                        "Admin changed role for user #{$targetUserId} from '{$existingRow['role']}' to '{$newRole}'.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'warning',
+                                        'context'     => ['from' => $existingRow['role'], 'to' => $newRole],
+                                    ]);
+                                }
+
+                                if ($existingRow['seller_status'] !== $sellerStatus) {
+                                    $changes['seller_status'] = ['from' => $existingRow['seller_status'], 'to' => $sellerStatus];
+                                    app_log_activity($conn, $reviewerId, 'user.seller_status_changed',
+                                        "Admin changed seller status for user #{$targetUserId} from '{$existingRow['seller_status']}' to '{$sellerStatus}'.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'info',
+                                        'context'     => ['from' => $existingRow['seller_status'], 'to' => $sellerStatus],
+                                    ]);
+                                }
+
+                                if ($passwordChanged) {
+                                    app_log_activity($conn, $reviewerId, 'user.password_changed',
+                                        "Admin changed password for user #{$targetUserId}.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'critical',
+                                        // Never log the password itself, not even hashed
+                                    ]);
+                                }
+
+                                if ($avatarPath !== null) {
+                                    app_log_activity($conn, $reviewerId, 'user.avatar_updated',
+                                        "Admin updated avatar for user #{$targetUserId}.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'info',
+                                    ]);
+                                }
+
+                                // Profile fields (name) — one combined entry
+                                $nameFrom = trim($existingRow['first_name'] . ' ' . $existingRow['last_name']);
+                                $nameTo   = trim($firstName . ' ' . $lastName);
+                                if ($nameFrom !== $nameTo) {
+                                    app_log_activity($conn, $reviewerId, 'user.profile_updated',
+                                        "Admin updated name for user #{$targetUserId} from '{$nameFrom}' to '{$nameTo}'.", [
+                                        'entity_type' => 'user',
+                                        'entity_id'   => $targetUserId,
+                                        'severity'    => 'info',
+                                        'context'     => ['from' => $nameFrom, 'to' => $nameTo],
+                                    ]);
+                                }
+
                                 $flash = ['type' => 'success', 'message' => 'User updated successfully.'];
                             }
                         }
@@ -557,7 +576,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
             } elseif ($prodCount > 0) {
                 $flash = ['type' => 'danger', 'message' => 'Cannot delete a seller who still has product listings.'];
             } else {
-                $stmt = $conn->prepare('SELECT avatar_path FROM users WHERE userId = ? LIMIT 1');
+                $stmt = $conn->prepare('SELECT username, email, role, avatar_path FROM users WHERE userId = ? LIMIT 1');
                 $stmt->bind_param('i', $targetUserId);
                 $stmt->execute();
                 $row = $stmt->get_result()->fetch_assoc();
@@ -599,6 +618,19 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                 @unlink($oldPath);
                             }
                         }
+                        // Log AFTER delete succeeds — actor_userId is the admin, not the deleted user
+                        // The FK is ON DELETE SET NULL so the log row survives
+                        app_log_activity($conn, (int) $user['userId'], 'user.deleted',
+                            "Admin deleted user '{$row['username']}' (#{$targetUserId}).", [
+                            'entity_type' => 'user',
+                            'entity_id'   => $targetUserId,
+                            'severity'    => 'critical',
+                            'context'     => [
+                                'username' => $row['username'],
+                                'email'    => $row['email'],
+                                'role'     => $row['role'],
+                            ],
+                        ]);
                         $flash = ['type' => 'success', 'message' => 'User deleted.'];
                     } else {
                         $flash = ['type' => 'danger', 'message' => 'Could not delete user.'];
