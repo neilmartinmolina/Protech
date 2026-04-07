@@ -161,15 +161,11 @@ $pageCssExt = [];
                         </div>
                     </div>
 
-                    <!-- Familiar / Academic — hover-to-scroll
-                         Single set of items. No clones, no CSS animation.
-                         JS scrolls the container on mouseenter, stops on mouseleave.
-                         To add skills: update $familiarSkills array only.
-                    -->
+
                     <div class="panel-card">
                         <div class="dev-skills-box text-center">
                             <h3 class="dev-skills-box-title">Familiar / Academic</h3>
-                            <div class="dev-scroll-carousel mt-4" id="devScrollCarousel">
+                            <div class="dev-skills-logo-grid">
                                 <?php
                                 $familiarSkills = [
                                     ['src' => 'media/languagelogo/GitHub.png',       'label' => 'GitHub'],
@@ -179,9 +175,13 @@ $pageCssExt = [];
                                     ['src' => 'media/languagelogo/C.png',            'label' => 'C'],
                                     ['src' => 'media/languagelogo/C++.png',          'label' => 'C++'],
                                     ['src' => 'media/languagelogo/Tailwind CSS.png', 'label' => 'Tailwind CSS'],
+                                    ['src' => 'media/languagelogo/Vuejs.png',        'label' => 'Vuejs'],
+                                    ['src' => 'media/languagelogo/React.png',        'label' => 'React'],
+                                    ['src' => 'media/languagelogo/PostgreSQL.png',   'label' => 'PostgreSQL'],
+                                    ['src' => 'media/languagelogo/Nuxtjs.png',       'label' => 'Nuxtjs'],
                                 ];
                                 foreach ($familiarSkills as $skill): ?>
-                                    <div class="dev-carousel-item"
+                                    <div class="dev-skill-item"
                                          data-bs-toggle="tooltip" data-bs-placement="top"
                                          title="<?= htmlspecialchars($skill['label']) ?>">
                                         <img src="<?= htmlspecialchars($skill['src']) ?>"
@@ -208,35 +208,6 @@ $pageCssExt = [];
     const tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     [...tooltipEls].forEach(el => new bootstrap.Tooltip(el));
 
-    // Hover-to-scroll carousel
-    (function () {
-        const track    = document.getElementById('devScrollCarousel');
-        const speed    = 1.2; // px per frame — adjust to taste
-        let   rafId    = null;
-        let   direction = 1; // 1 = forward, -1 = backward
-
-        function scroll() {
-            track.scrollLeft += speed * direction;
-
-            // Bounce at ends
-            if (track.scrollLeft + track.clientWidth >= track.scrollWidth) {
-                direction = -1;
-            } else if (track.scrollLeft <= 0) {
-                direction = 1;
-            }
-
-            rafId = requestAnimationFrame(scroll);
-        }
-
-        track.addEventListener('mouseenter', () => {
-            if (!rafId) rafId = requestAnimationFrame(scroll);
-        });
-
-        track.addEventListener('mouseleave', () => {
-            cancelAnimationFrame(rafId);
-            rafId = null;
-        });
-    })();
 </script>
 </body>
 </html>

@@ -13,6 +13,7 @@
                     <li><a href="#about">About Us</a></li>
                     <li><a href="#">Careers</a></li>
                     <li><a href="#">Contact</a></li>
+                    <li>Icons by <a target="_blank" href="https://icons8.com">Icons8</a></li>
                 </ul>
             </div>
             <div class="col-6 col-lg-2">

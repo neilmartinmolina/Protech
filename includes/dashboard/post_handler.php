@@ -204,25 +204,90 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
     // ── Save product ──────────────────────────────────────────────────────────
     if ($action === 'save_product' && ($role === 'seller' || $role === 'admin')) {
+        $isNew     = empty($_POST['product_id']);
+        $productId = (int) ($_POST['product_id'] ?? 0);
+
+        // Fetch current state  BEFORE the upsert so we can diff on update
+        $before = null;
+        if (!$isNew && $productId > 0) {
+            $bStmt = $conn->prepare('
+                SELECT p.name, p.description, p.price, p.stock, p.is_active,
+                    p.icon_class, b.name AS brand, c.name AS category
+                FROM products p
+                LEFT JOIN brands b     ON b.brandId     = p.brandId
+                LEFT JOIN categories c ON c.categoryId  = p.categoryId
+                WHERE p.productId = ?
+                LIMIT 1
+            ');
+            $bStmt->bind_param('i', $productId);
+            $bStmt->execute();
+            $before = $bStmt->get_result()->fetch_assoc();
+            $bStmt->close();
+        }
+
         $result = app_upsert_product($user, $_POST);
         $flash  = ['type' => $result['success'] ? 'success' : 'danger', 'message' => $result['message']];
 
         if ($result['success']) {
             $productId = (int) ($result['product_id'] ?? 0);
-            $isNew     = empty($_POST['product_id']);
-            app_log_activity($conn, (int) $user['userId'], $isNew ? 'product.created' : 'product.updated',
-                ($isNew ? 'Created' : 'Updated') . " product '{$_POST['name']}'.", [
-                'entity_type' => 'product',
-                'entity_id'   => $productId,
-                'context'     => ['name' => $_POST['name'] ?? '', 'price' => $_POST['price'] ?? ''],
-            ]);
+
+            if ($isNew) {
+                // CREATE — log everything submitted
+                app_log_activity($conn, (int) $user['userId'], 'product.created',
+                    "Created product '{$_POST['name']}' (#{$productId}).", [
+                    'entity_type' => 'product',
+                    'entity_id'   => $productId,
+                    'severity'    => 'info',
+                    'context'     => [
+                        'name'        => $_POST['name']        ?? '',
+                        'brand'       => $_POST['brand']       ?? '',
+                        'category'    => $_POST['category']    ?? '',
+                        'price'       => $_POST['price']       ?? '',
+                        'stock'       => $_POST['stock']       ?? '',
+                        'is_active'   => $_POST['is_active']   ?? '0',
+                    ],
+                ]);
+            } else {
+                // UPDATE — diff against fetched state, only log what changed
+                $after = [
+                    'name'      => $_POST['name']      ?? '',
+                    'brand'     => $_POST['brand']      ?? '',
+                    'category'  => $_POST['category']   ?? '',
+                    'price'     => $_POST['price']       ?? '',
+                    'stock'     => $_POST['stock']       ?? '',
+                    'is_active' => !empty($_POST['is_active']) ? '1' : '0',
+                ];
+
+                $changes = [];
+                if ($before) {
+                    $watch = ['name', 'brand', 'category', 'price', 'stock', 'is_active'];
+                    foreach ($watch as $field) {
+                        $old = (string) ($before[$field] ?? '');
+                        $new = (string) ($after[$field]  ?? '');
+                        if ($old !== $new) {
+                            $changes[$field] = ['from' => $old, 'to' => $new];
+                        }
+                    }
+                }
+
+                app_log_activity($conn, (int) $user['userId'], 'product.updated',
+                    "Updated product '{$_POST['name']}' (#{$productId})" . ($changes ? ' — fields changed: ' . implode(', ', array_keys($changes)) : ' — no field changes.') . '.', [
+                    'entity_type' => 'product',
+                    'entity_id'   => $productId,
+                    'severity'    => 'info',
+                    'context'     => [
+                        'changes' => $changes ?: null,
+                    ],
+                ]);
+            }
         }
 
+        // ── Image uploads  ─────────────────────────────────────────────────────
         if ($result['success'] && !empty($_FILES['product_images']['name'][0])) {
             $productId   = (int) ($result['product_id'] ?? 0);
             $upload      = dirname(__DIR__, 2) . '/uploads/products/' . $productId . '/';
             $category    = trim($_POST['category'] ?? 'Product');
-            $productName = trim($_POST['name'] ?? 'Product');
+            $productName = trim($_POST['name']     ?? 'Product');
             $allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
             $maxBytes    = 5 * 1024 * 1024;
 
@@ -233,21 +298,13 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
 
                 $saved   = 0;
                 $skipped = 0;
+
                 foreach ($_FILES['product_images']['tmp_name'] as $i => $tmpPath) {
-                    if ($_FILES['product_images']['error'][$i] !== UPLOAD_ERR_OK) {
-                        $skipped++;
-                        continue;
-                    }
-                    if ($_FILES['product_images']['size'][$i] > $maxBytes) {
-                        $skipped++;
-                        continue;
-                    }
+                    if ($_FILES['product_images']['error'][$i] !== UPLOAD_ERR_OK) { $skipped++; continue; }
+                    if ($_FILES['product_images']['size'][$i]  > $maxBytes)        { $skipped++; continue; }
 
                     $mime = mime_content_type($tmpPath);
-                    if (!in_array($mime, $allowedMime, true)) {
-                        $skipped++;
-                        continue;
-                    }
+                    if (!in_array($mime, $allowedMime, true)) { $skipped++; continue; }
 
                     $ext = match ($mime) {
                         'image/png'  => 'png',
@@ -255,16 +312,14 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                         'image/gif'  => 'gif',
                         default      => 'jpg',
                     };
+
                     $altText  = $productName . ' – ' . $category;
                     $filename = sprintf('%d_%s.%s', $productId, bin2hex(random_bytes(6)), $ext);
                     $dest     = $upload . $filename;
 
                     if (move_uploaded_file($tmpPath, $dest)) {
-                        $webPath = 'uploads/products/' . $productId . '/' . $filename;
-                        $stmt    = $conn->prepare('
-                            INSERT INTO product_images (productId, image_path, alt_text, sort_order)
-                            VALUES (?, ?, ?, ?)
-                        ');
+                        $webPath   = 'uploads/products/' . $productId . '/' . $filename;
+                        $stmt      = $conn->prepare('INSERT INTO product_images (productId, image_path, alt_text, sort_order) VALUES (?, ?, ?, ?)');
                         $sortOrder = $saved + 1;
                         $stmt->bind_param('issi', $productId, $webPath, $altText, $sortOrder);
                         $stmt->execute();
@@ -273,6 +328,20 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                     } else {
                         $skipped++;
                     }
+                }
+
+                // Log image upload result regardless of skipped count
+                if ($saved > 0) {
+                    app_log_activity($conn, (int) $user['userId'], 'product.images_uploaded',
+                        "Uploaded {$saved} image(s) for product '{$productName}' (#{$productId})" . ($skipped > 0 ? ", {$skipped} skipped." : '.'), [
+                        'entity_type' => 'product',
+                        'entity_id'   => $productId,
+                        'severity'    => 'info',
+                        'context'     => [
+                            'saved'   => $saved,
+                            'skipped' => $skipped,
+                        ],
+                    ]);
                 }
 
                 if ($skipped > 0 && is_array($flash)) {
