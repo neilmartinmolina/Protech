@@ -83,17 +83,18 @@ function app_log_activity(
         return false;
     }
 
-    // Optional notifications
+    // ── Notifications ─────────────────────────────────────────────────────────
     if (!empty($opts['notify']) && is_array($opts['notify'])) {
         foreach ($opts['notify'] as $recipientId => $notif) {
             $recipientId = (int) $recipientId;
-            $title       = mb_substr((string) ($notif['title'] ?? ''), 0, 128);
-            $body        = mb_substr((string) ($notif['body']  ?? ''), 0, 512);
+            $type        = mb_substr((string) ($notif['type']    ?? 'general'),  0, 60);
+            $title       = mb_substr((string) ($notif['title']   ?? ''),         0, 150);
+            $message     = mb_substr((string) ($notif['message'] ?? ''),         0, 512);
             $link        = isset($notif['link']) ? mb_substr((string) $notif['link'], 0, 255) : null;
 
             $ns = $conn->prepare(
-                'INSERT INTO notifications (recipient_userId, title, body, link)
-                 VALUES (?, ?, ?, ?)'
+                'INSERT INTO notifications (userId, type, title, message, link, entity_type, entity_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
 
             if ($ns === false) {
@@ -101,7 +102,15 @@ function app_log_activity(
                 continue;
             }
 
-            $ns->bind_param('isss', $recipientId, $title, $body, $link);
+            $ns->bind_param('isssssi',
+                $recipientId,
+                $type,
+                $title,
+                $message,
+                $link,
+                $entityType,
+                $entityId
+            );
             $ns->execute();
             $ns->close();
         }
@@ -174,10 +183,12 @@ function app_get_activity_logs(mysqli $conn, string $role, int $userId, int $lim
 function app_get_notifications(mysqli $conn, int $userId, int $limit = 100): array
 {
     $stmt = $conn->prepare(
-        'SELECT * FROM notifications
-         WHERE recipient_userId = ?
-         ORDER BY created_at DESC
-         LIMIT ?'
+        'SELECT notificationId, userId, type, title, message, link,
+        entity_type, entity_id, is_read, read_at, created_at
+        FROM notifications
+        WHERE userId = ?
+        ORDER BY created_at DESC
+        LIMIT ?'
     );
     if ($stmt === false) return [];
     $stmt->bind_param('ii', $userId, $limit);
@@ -193,7 +204,7 @@ function app_get_notifications(mysqli $conn, int $userId, int $limit = 100): arr
 function app_count_unread_notifications(mysqli $conn, int $userId): int
 {
     $stmt = $conn->prepare(
-        'SELECT COUNT(*) FROM notifications WHERE recipient_userId = ? AND is_read = 0'
+        'SELECT COUNT(*) FROM notifications WHERE userId = ? AND is_read = 0'
     );
     if ($stmt === false) return 0;
     $stmt->bind_param('i', $userId);
@@ -210,7 +221,7 @@ function app_count_unread_notifications(mysqli $conn, int $userId): int
 function app_mark_notifications_read(mysqli $conn, int $userId): void
 {
     $stmt = $conn->prepare(
-        'UPDATE notifications SET is_read = 1 WHERE recipient_userId = ? AND is_read = 0'
+        'UPDATE notifications SET is_read = 1, read_at = NOW() WHERE userId = ? AND is_read = 0'
     );
     if ($stmt === false) return;
     $stmt->bind_param('i', $userId);

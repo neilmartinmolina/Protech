@@ -75,14 +75,17 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                     'entity_id'   => $applicationId,
                     'severity'    => 'info',
                     'context'     => ['store_name' => $storeName, 'seller_id' => $userId],
-                    'notify'      => [
+                    'notify' => [
                         $userId => [
-                            'title' => 'Your seller application was approved!',
-                            'body'  => "Congratulations — {$storeName} is now live on ProTech.",
-                            'link'  => 'dashboard.php?tab=dashboard',
+                            'type'    => 'seller_application_approved',
+                            'title'   => 'Your seller application was approved!',
+                            'message' => "Congratulations — {$storeName} is now live on ProTech.",
+                            'link'    => 'dashboard.php?tab=dashboard',
                         ],
                     ],
                 ]);
+
+                $StoreDashboardUrl = rtrim(SITE_URL, '/') . '/dashboard.php?tab=dashboard';
 
                 try {
                     $mail = dashboard_mailer();
@@ -96,6 +99,13 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                             <div style='padding:24px;color:#e0e0e0;line-height:1.6;'>
                                 <p>Hi " . app_sanitize($application['first_name']) . ",</p>
                                 <p>Your seller application for <strong>" . app_sanitize($storeName) . "</strong> has been approved. You can now log in to your dashboard and start listing products.</p>
+                                <p style='margin:24px 0;text-align:center;'>
+                                    <a href='{$StoreDashboardUrl}'
+                                    style='display:inline-block;background:#ff7315;color:#fff!important;padding:14px 32px;
+                                            border-radius:8px;font-weight:600;font-size:1rem;text-decoration:none;'>
+                                        Get Started
+                                    </a>
+                                </p>
                                 <p style='color:#999;font-size:.85rem;'>Your login credentials remain the same — no password change required.</p>
                             </div>
                         </div>
@@ -522,7 +532,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                                         $stmt->bind_param('ssssssi', $firstName, $lastName, $username, $email, $newRole, $sellerStatus, $avatarPath, $targetUserId);
                                     } else {
                                         $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, email=?, role=?, seller_status=? WHERE userId=?');
-                                        $stmt->bind_param('sssssi', $firstName, $lastName, $username, $email, $newRole, $sellerStatus, $targetUserId);
+                                        $stmt->bind_param('ssssssi', $firstName, $lastName, $username, $email, $newRole, $sellerStatus, $targetUserId);
                                     }
                                 }
                                 $stmt->execute();

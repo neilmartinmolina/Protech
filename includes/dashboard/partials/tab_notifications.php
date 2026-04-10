@@ -20,7 +20,7 @@
                         <div class="notif-dot" aria-hidden="true"></div>
                         <div class="notif-body">
                             <div class="notif-title"><?= app_sanitize($n['title']) ?></div>
-                            <div class="notif-text"><?= app_sanitize($n['body']) ?></div>
+                            <div class="notif-text"><?= app_sanitize($n['message']) ?></div>
                             <?php if (!empty($n['link'])): ?>
                                 <a href="<?= app_sanitize($n['link']) ?>" class="notif-link">View &rarr;</a>
                             <?php endif; ?>
