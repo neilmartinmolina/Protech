@@ -8,10 +8,10 @@ $dashboardLabel = 'Dashboard';
 $showDashboardLink = false;
 $avatarUrl = app_avatar_url($navUser);
 if ($navUser && ($navUser['role'] ?? '') === 'seller') {
-    $dashboardLabel = 'Seller Dashboard';
+    $dashboardLabel = 'Dashboard';
     $showDashboardLink = true;
-} elseif ($navUser && ($navUser['role'] ?? '') === 'admin') {
-    $dashboardLabel = 'Admin Dashboard';
+} elseif ($navUser && (($navUser['role'] ?? '') === 'admin' || ($navUser['role'] ?? '') === 'superadmin')) {
+    $dashboardLabel = 'Dashboard';
     $showDashboardLink = true;
 }
 ?>

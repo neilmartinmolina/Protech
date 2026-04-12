@@ -33,7 +33,7 @@
             </li>
         <?php endforeach; ?>
     </ul>
-    <?php if ($role === 'admin'): ?>
+    <?php if ($role === 'admin' || $role === 'superadmin'): ?>
     <ul class="sidebar-nav mt-2">
         <li>
             <a href="aboutdev.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'aboutdev.php' ? 'active' : '' ?>">

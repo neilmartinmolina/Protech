@@ -130,7 +130,7 @@ function app_log_activity(
  */
 function app_get_activity_logs(mysqli $conn, string $role, int $userId, int $limit = 200): array
 {
-    if ($role === 'admin') {
+    if ($role === 'admin' || $role === 'superadmin') {
         $stmt = $conn->prepare(
             'SELECT l.*, u.username AS actor_username, u.first_name, u.last_name
              FROM activity_logs l

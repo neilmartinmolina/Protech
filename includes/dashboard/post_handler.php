@@ -213,7 +213,7 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
     }
 
     // ── Save product ──────────────────────────────────────────────────────────
-    if ($action === 'save_product' && ($role === 'seller' || $role === 'admin')) {
+    if ($action === 'save_product' && ($role === 'seller' || $role === 'admin' || $role === 'superadmin')) {
         $isNew     = empty($_POST['product_id']);
         $productId = (int) ($_POST['product_id'] ?? 0);
 
@@ -373,7 +373,9 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
         $storeName     = trim($_POST['store_name'] ?? '');
         $passwordPlain = (string) ($_POST['password'] ?? '');
 
-        $allowedRoles  = ['customer', 'seller', 'admin'];
+        $allowedRoles = app_can_add_admin($user) 
+            ? ['customer', 'seller', 'admin', 'superadmin'] 
+            : ['customer', 'seller'];
         $allowedSeller = ['not_applicable', 'pending', 'approved', 'rejected'];
 
         if ($firstName === '' || $lastName === '' || $username === '' || $email === '') {
@@ -638,92 +640,100 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
         } elseif ($targetUserId === (int) $user['userId']) {
             $flash = ['type' => 'danger', 'message' => 'You cannot delete your own account.'];
         } else {
-            $ordStmt = $conn->prepare('SELECT COUNT(*) AS c FROM orders WHERE userId = ?');
-            $ordStmt->bind_param('i', $targetUserId);
-            $ordStmt->execute();
-            $orderCount = (int) ($ordStmt->get_result()->fetch_assoc()['c'] ?? 0);
-            $ordStmt->close();
+            $checkStmt = $conn->prepare('SELECT role FROM users WHERE userId = ? LIMIT 1');
+            $checkStmt->bind_param('i', $targetUserId);
+            $checkStmt->execute();
+            $targetRole = $checkStmt->get_result()->fetch_assoc()['role'] ?? '';
+            $checkStmt->close();
 
-            $prodStmt = $conn->prepare('SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ?');
-            $prodStmt->bind_param('i', $targetUserId);
-            $prodStmt->execute();
-            $prodCount = (int) ($prodStmt->get_result()->fetch_assoc()['c'] ?? 0);
-            $prodStmt->close();
-
-            if ($orderCount > 0) {
-                $flash = ['type' => 'danger', 'message' => 'Cannot delete a user who has placed orders.'];
-            } elseif ($prodCount > 0) {
-                $flash = ['type' => 'danger', 'message' => 'Cannot delete a seller who still has product listings.'];
+            if (!app_can_delete_user($user, ['role' => $targetRole])) {
+                $flash = ['type' => 'danger', 'message' => 'You do not have permission to delete this user.'];
             } else {
-                $stmt = $conn->prepare('SELECT username, email, role, avatar_path FROM users WHERE userId = ? LIMIT 1');
-                $stmt->bind_param('i', $targetUserId);
-                $stmt->execute();
-                $row = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
+                $ordStmt = $conn->prepare('SELECT COUNT(*) AS c FROM orders WHERE userId = ?');
+                $ordStmt->bind_param('i', $targetUserId);
+                $ordStmt->execute();
+                $orderCount = (int) ($ordStmt->get_result()->fetch_assoc()['c'] ?? 0);
+                $ordStmt->close();
 
-                if ($row) {
-                    $rt = $conn->prepare('DELETE FROM remember_tokens WHERE userId = ?');
-                    $rt->bind_param('i', $targetUserId);
-                    $rt->execute();
-                    $rt->close();
+                $prodStmt = $conn->prepare('SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ?');
+                $prodStmt->bind_param('i', $targetUserId);
+                $prodStmt->execute();
+                $prodCount = (int) ($prodStmt->get_result()->fetch_assoc()['c'] ?? 0);
+                $prodStmt->close();
 
-                    if (app_table_exists($conn, 'email_verifications')) {
-                        $vt = $conn->prepare('DELETE FROM email_verifications WHERE userId = ?');
-                        $vt->bind_param('i', $targetUserId);
-                        $vt->execute();
-                        $vt->close();
-                    }
-
-                    if (app_table_exists($conn, 'password_resets')) {
-                        $pr = $conn->prepare('DELETE FROM password_resets WHERE userId = ?');
-                        $pr->bind_param('i', $targetUserId);
-                        $pr->execute();
-                        $pr->close();
-                    }
-
-                    if (app_table_exists($conn, 'seller_applications')) {
-                        $sa = $conn->prepare('DELETE FROM seller_applications WHERE userId = ?');
-                        $sa->bind_param('i', $targetUserId);
-                        $sa->execute();
-                        $sa->close();
-                    }
-
-                    $del = $conn->prepare('DELETE FROM users WHERE userId = ?');
-                    $del->bind_param('i', $targetUserId);
-                    if ($del->execute() && $del->affected_rows > 0) {
-                        if (!empty($row['avatar_path'])) {
-                            $oldPath = __DIR__ . '/../../' . ltrim($row['avatar_path'], '/');
-                            if (is_file($oldPath) && str_contains(str_replace('\\', '/', $oldPath), '/media/avatars/')) {
-                                @unlink($oldPath);
-                            }
-                        }
-                        // Log AFTER delete succeeds — actor_userId is the admin, not the deleted user
-                        // The FK is ON DELETE SET NULL so the log row survives
-                        app_log_activity($conn, (int) $user['userId'], 'user.deleted',
-                            "Admin deleted user '{$row['username']}' (#{$targetUserId}).", [
-                            'entity_type' => 'user',
-                            'entity_id'   => $targetUserId,
-                            'severity'    => 'critical',
-                            'context'     => [
-                                'username' => $row['username'],
-                                'email'    => $row['email'],
-                                'role'     => $row['role'],
-                            ],
-                        ]);
-                        $flash = ['type' => 'success', 'message' => 'User deleted.'];
-                    } else {
-                        $flash = ['type' => 'danger', 'message' => 'Could not delete user.'];
-                    }
-                    $del->close();
+                if ($orderCount > 0) {
+                    $flash = ['type' => 'danger', 'message' => 'Cannot delete a user who has placed orders.'];
+                } elseif ($prodCount > 0) {
+                    $flash = ['type' => 'danger', 'message' => 'Cannot delete a seller who still has product listings.'];
                 } else {
-                    $flash = ['type' => 'danger', 'message' => 'User not found.'];
+                    $stmt = $conn->prepare('SELECT username, email, role, avatar_path FROM users WHERE userId = ? LIMIT 1');
+                    $stmt->bind_param('i', $targetUserId);
+                    $stmt->execute();
+                    $row = $stmt->get_result()->fetch_assoc();
+                    $stmt->close();
+
+                    if ($row) {
+                        $rt = $conn->prepare('DELETE FROM remember_tokens WHERE userId = ?');
+                        $rt->bind_param('i', $targetUserId);
+                        $rt->execute();
+                        $rt->close();
+
+                        if (app_table_exists($conn, 'email_verifications')) {
+                            $vt = $conn->prepare('DELETE FROM email_verifications WHERE userId = ?');
+                            $vt->bind_param('i', $targetUserId);
+                            $vt->execute();
+                            $vt->close();
+                        }
+
+                        if (app_table_exists($conn, 'password_resets')) {
+                            $pr = $conn->prepare('DELETE FROM password_resets WHERE userId = ?');
+                            $pr->bind_param('i', $targetUserId);
+                            $pr->execute();
+                            $pr->close();
+                        }
+
+                        if (app_table_exists($conn, 'seller_applications')) {
+                            $sa = $conn->prepare('DELETE FROM seller_applications WHERE userId = ?');
+                            $sa->bind_param('i', $targetUserId);
+                            $sa->execute();
+                            $sa->close();
+                        }
+
+                        $del = $conn->prepare('DELETE FROM users WHERE userId = ?');
+                        $del->bind_param('i', $targetUserId);
+                        if ($del->execute() && $del->affected_rows > 0) {
+                            if (!empty($row['avatar_path'])) {
+                                $oldPath = __DIR__ . '/../../' . ltrim($row['avatar_path'], '/');
+                                if (is_file($oldPath) && str_contains(str_replace('\\', '/', $oldPath), '/media/avatars/')) {
+                                    @unlink($oldPath);
+                                }
+                            }
+                            app_log_activity($conn, (int) $user['userId'], 'user.deleted',
+                                "Admin deleted user '{$row['username']}' (#{$targetUserId}).", [
+                                'entity_type' => 'user',
+                                'entity_id'   => $targetUserId,
+                                'severity'    => 'critical',
+                                'context'     => [
+                                    'username' => $row['username'],
+                                    'email'    => $row['email'],
+                                    'role'     => $row['role'],
+                                ],
+                            ]);
+                            $flash = ['type' => 'success', 'message' => 'User deleted.'];
+                        } else {
+                            $flash = ['type' => 'danger', 'message' => 'Could not delete user.'];
+                        }
+                        $del->close();
+                    } else {
+                        $flash = ['type' => 'danger', 'message' => 'User not found.'];
+                    }
                 }
             }
         }
     }
 
     // ── Update order status ───────────────────────────────────────────────────
-    if ($action === 'update_order_status' && ($role === 'seller' || $role === 'admin')) {
+    if ($action === 'update_order_status' && ($role === 'seller' || $role === 'admin' || $role === 'superadmin')) {
         $orderId         = (int) ($_POST['order_id'] ?? 0);
         $status          = trim($_POST['status'] ?? '');
         $allowedStatuses = ['placed', 'processing', 'completed', 'cancelled'];
@@ -766,6 +776,93 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
                 $flash = ['type' => 'success', 'message' => 'Order status updated successfully.'];
             } else {
                 $flash = ['type' => 'danger', 'message' => 'Order not found or not allowed.'];
+            }
+        }
+    }
+
+    // ── Hide/Unhide product (admin) ─────────────────────────────────────────────
+    if ($action === 'hide_product' && app_is_admin($user)) {
+        $productId = (int) ($_POST['product_id'] ?? 0);
+        $hide = (int) ($_POST['hide'] ?? 0); // 1 = hide, 0 = unhide
+        $newStatus = $hide ? 0 : 1; // hide → is_active=0, unhide → is_active=1
+        $reason = trim($_POST['reason'] ?? '');
+
+        if ($productId <= 0) {
+            $flash = ['type' => 'danger', 'message' => 'Invalid product.'];
+        } else {
+            $checkStmt = $conn->prepare('SELECT name, is_active FROM products WHERE productId = ? LIMIT 1');
+            $checkStmt->bind_param('i', $productId);
+            $checkStmt->execute();
+            $productRow = $checkStmt->get_result()->fetch_assoc();
+            $checkStmt->close();
+
+            if (!$productRow) {
+                $flash = ['type' => 'danger', 'message' => 'Product not found.'];
+            } else {
+                $currentStatus = (int) $productRow['is_active'];
+                $actionVerb = $hide ? 'hidden' : 'unhidden';
+
+                if ($currentStatus === $newStatus) {
+                    $flash = ['type' => 'warning', 'message' => 'Product is already ' . ($hide ? 'hidden' : 'visible') . '.'];
+                } else {
+                    $stmt = $conn->prepare('UPDATE products SET is_active = ? WHERE productId = ?');
+                    $stmt->bind_param('ii', $newStatus, $productId);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    app_log_activity($conn, (int) $user['userId'], 'product.' . $actionVerb,
+                        "Product #{$productId} (" . $productRow['name'] . ") has been {$actionVerb}." . ($reason ? " Reason: {$reason}" : ''), [
+                        'entity_type' => 'product',
+                        'entity_id'   => $productId,
+                        'severity'    => 'warning',
+                        'context'     => ['reason' => $reason, 'new_status' => $newStatus],
+                    ]);
+
+                    $flash = ['type' => 'success', 'message' => 'Product ' . $actionVerb . ' successfully.'];
+                }
+            }
+        }
+    }
+
+    // ── Ban user (admin) ─────────────────────────────────────────────────────
+    if ($action === 'ban_user' && app_is_admin($user)) {
+        $targetUserId = (int) ($_POST['user_id'] ?? 0);
+        $banStatus = !empty($_POST['ban']) ? 1 : 0;
+
+        if ($targetUserId <= 0) {
+            $flash = ['type' => 'danger', 'message' => 'Invalid user.'];
+        } elseif ($targetUserId === (int) $user['userId']) {
+            $flash = ['type' => 'danger', 'message' => 'You cannot ban your own account.'];
+        } else {
+            $checkStmt = $conn->prepare('SELECT role, is_banned FROM users WHERE userId = ? LIMIT 1');
+            $checkStmt->bind_param('i', $targetUserId);
+            $checkStmt->execute();
+            $targetRow = $checkStmt->get_result()->fetch_assoc();
+            $checkStmt->close();
+
+            if (!$targetRow) {
+                $flash = ['type' => 'danger', 'message' => 'User not found.'];
+            } else {
+                $targetRole = $targetRow['role'] ?? '';
+
+                if (!app_can_delete_user($user, ['role' => $targetRole])) {
+                    $flash = ['type' => 'danger', 'message' => 'You do not have permission to ban this user.'];
+                } else {
+                    $stmt = $conn->prepare('UPDATE users SET is_banned = ? WHERE userId = ?');
+                    $stmt->bind_param('ii', $banStatus, $targetUserId);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    $banAction = $banStatus ? 'banned' : 'unbanned';
+                    app_log_activity($conn, (int) $user['userId'], 'user.' . $banAction,
+                        "User #{$targetUserId} has been {$banAction}.", [
+                        'entity_type' => 'user',
+                        'entity_id'   => $targetUserId,
+                        'severity'    => 'warning',
+                        'context'     => ['target_user_id' => $targetUserId],
+                    ]);
+                    $flash = ['type' => 'success', 'message' => 'User ' . ($banStatus ? 'banned' : 'unbanned') . ' successfully.'];
+                }
             }
         }
     }

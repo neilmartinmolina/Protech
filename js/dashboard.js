@@ -248,6 +248,21 @@
         `;
         }
 
+        const hideProductModal = document.getElementById('hideProductModal');
+        if (hideProductModal) {
+            hideProductModal.querySelector('.app-modal__slot').innerHTML = `
+            <form method="post" id="hideProductForm" class="modal-form-grid">
+                <input type="hidden" name="action" value="hide_product">
+                <input type="hidden" name="product_id" value="">
+                <input type="hidden" name="hide" value="">
+                <div>
+                    <label>Reason <span style="font-weight:400;color:var(--text-muted);">(optional — recorded in activity log)</span></label>
+                    <textarea name="reason" placeholder="Reason for hiding/unhiding this product..."></textarea>
+                </div>
+            </form>
+        `;
+        }
+
         const userModal = document.getElementById('userModal');
         if (userModal) {
             userModal.querySelector('.app-modal__slot').innerHTML = `
@@ -263,6 +278,7 @@
                         <option value="customer">Customer</option>
                         <option value="seller">Seller</option>
                         <option value="admin">Admin</option>
+                        <option value="superadmin">Superadmin</option>
                     </select>
                 </div>
                 <div><label>Seller status</label>

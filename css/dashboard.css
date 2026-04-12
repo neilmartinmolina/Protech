@@ -65,6 +65,18 @@
     border: none;
     cursor: pointer;
 }
+.approve-btn i,
+.reject-btn i,
+.edit-btn i,
+.status-btn i {
+    font-size: 0.9rem;
+}
+.approve-btn:has(i),
+.reject-btn:has(i),
+.edit-btn:has(i),
+.status-btn:has(i) {
+    padding: 0.45rem 0.6rem;
+}
 .approve-btn,
 .edit-btn,
 .add-product-btn,

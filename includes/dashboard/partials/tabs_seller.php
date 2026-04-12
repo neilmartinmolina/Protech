@@ -49,12 +49,12 @@
                             <td><?= (int) $product['stock'] ?></td>
                             <td><span class="pill <?= (int) $product['is_active'] ? 'completed' : 'cancelled' ?>"><?= (int) $product['is_active'] ? 'Active' : 'Inactive' ?></span></td>
                             <td>
-                                <button class="edit-btn" type="button"
+                                <button class="edit-btn" type="button" title="Edit"
                                     data-modal-target="#productModal"
                                     data-modal-title="Edit Product"
                                     data-modal-message="Update this product."
                                     data-modal-confirm="Save Product"
-                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'save_product', 'product_id' => (int) $product['productId'], 'name' => $product['name'], 'brand' => $product['brand'], 'category' => $product['category'], 'description' => $product['description'], 'price' => $product['price'], 'stock' => (int) $product['stock'], 'icon_class' => $product['icon_class'], 'is_active' => (int) $product['is_active']])) ?>'>Edit</button>
+                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'save_product', 'product_id' => (int) $product['productId'], 'name' => $product['name'], 'brand' => $product['brand'], 'category' => $product['category'], 'description' => $product['description'], 'price' => $product['price'], 'stock' => (int) $product['stock'], 'icon_class' => $product['icon_class'], 'is_active' => (int) $product['is_active']])) ?>'><i class="fa-solid fa-pencil"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -83,12 +83,12 @@
                             <td><span class="pill <?= app_sanitize($order['status']) ?>"><?= app_sanitize(ucfirst($order['status'])) ?></span></td>
                             <td><?= app_sanitize($order['created_at']) ?></td>
                             <td>
-                                <button class="status-btn" type="button"
+                                <button class="status-btn" type="button" title="Update Status"
                                     data-modal-target="#orderStatusModal"
                                     data-modal-title="Update Order Status"
                                     data-modal-message="Change the status for order #<?= (int) $order['orderId'] ?>."
                                     data-modal-confirm="Save Status"
-                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>Update</button>
+                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'><i class="fa-solid fa-pen-to-square"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; ?>

@@ -21,6 +21,7 @@ $user       = $postResult['user'];
 $role       = $postResult['role'];
 
 $view = dashboard_build_view_data($conn, $user, $role);
+$currentUser = $user;
 extract($view, EXTR_SKIP);
 
 $pageTitle  = ucfirst($role) . ' Dashboard — ProTech';
@@ -64,7 +65,7 @@ $dashboardPayload = [
         <?php include __DIR__ . '/includes/dashboard/partials/topbar.php'; ?>
 
         <div class="admin-content">
-            <?php if ($role === 'admin'): ?>
+            <?php if ($role === 'admin' || $role === 'superadmin'): ?>
                 <?php include __DIR__ . '/includes/dashboard/partials/tabs_admin.php'; ?>
             <?php else: ?>
                 <?php include __DIR__ . '/includes/dashboard/partials/tabs_seller.php'; ?>

@@ -12,7 +12,7 @@ $severityPill = [
 <div class="table-card">
     <div class="table-card-header">
         <h5>
-            <?= $role === 'admin' ? 'System Activity Logs' : 'Your Activity Logs' ?>
+            <?= ($role === 'admin' || $role === 'superadmin') ? 'System Activity Logs' : 'Your Activity Logs' ?>
             <span class="badge-count"><?= count($activityLogs) ?></span>
         </h5>
         <?php if ($role === 'seller'): ?>
@@ -32,7 +32,7 @@ $severityPill = [
                 <thead>
                     <tr>
                         <th>#</th>
-                        <?php if ($role === 'admin'): ?>
+                        <?php if ($role === 'admin' || $role === 'superadmin'): ?>
                             <th>Actor</th>
                         <?php endif; ?>
                         <th>Action</th>
@@ -40,7 +40,7 @@ $severityPill = [
                         <th>Description</th>
                         <th>Severity</th>
                         <th>When</th>
-                        <?php if ($role === 'admin'): ?>
+                        <?php if ($role === 'admin' || $role === 'superadmin'): ?>
                             <th>Context</th>
                         <?php endif; ?>
                     </tr>
@@ -49,7 +49,7 @@ $severityPill = [
                 <?php foreach ($activityLogs as $log): ?>
                     <tr>
                         <td><?= (int) $log['logId'] ?></td>
-                        <?php if ($role === 'admin'): ?>
+                        <?php if ($role === 'admin' || $role === 'superadmin'): ?>
                             <td><?= app_sanitize(
                                 trim(($log['first_name'] ?? '') . ' ' . ($log['last_name'] ?? ''))
                                 ?: ($log['actor_username'] ?? '#' . $log['actor_userId'])
@@ -75,18 +75,18 @@ $severityPill = [
                         <td style="white-space:nowrap;">
                             <?= app_sanitize(date('M j, Y · g:i a', strtotime($log['created_at']))) ?>
                         </td>
-                        <?php if ($role === 'admin'): ?>
+                        <?php if ($role === 'admin' || $role === 'superadmin'): ?>
                             <td>
                                 <?php if (!empty($log['context'])): ?>
                                     <?php $ctx = json_decode($log['context'], true); ?>
                                     <?php if (is_array($ctx)): ?>
-                                        <button class="edit-btn" type="button"
+                                        <button class="edit-btn" type="button" title="View Context"
                                             style="font-size:.75rem;padding:.2rem .55rem;"
                                             onclick="alert(<?= htmlspecialchars(json_encode(
                                                 json_encode($ctx, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
                                                 JSON_UNESCAPED_UNICODE
                                             )) ?>)">
-                                            View
+                                            <i class="fa-solid fa-eye"></i>
                                         </button>
                                     <?php else: ?>
                                         <span class="text-muted" style="font-size:.8rem;">—</span>

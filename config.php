@@ -22,5 +22,6 @@ define('SMTP_HOST',   'smtp.gmail.com');
 define('SMTP_PORT',   587);
 define('SMTP_USER',   'neilmartinmolina@gmail.com');
 define('SMTP_PASS',   'yyio jctx phof utie');
-define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+define('ADMIN_EMAIL',    'neilmartinmolina@gmail.com');
+define('SUPERADMIN_EMAIL', 'neilmartinmolina@gmail.com');
 define('FROM_NAME',   'Protech');

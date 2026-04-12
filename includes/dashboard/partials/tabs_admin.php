@@ -7,6 +7,7 @@
 /** @var array $adminUsers */
 /** @var array $activityLogs */
 /** @var array $notifications */
+/** @var array $currentUser */
 ?>
 <?php if ($tab === 'dashboard'): ?>
     <div class="row g-3 mb-4">
@@ -64,13 +65,13 @@
                             <td><?= app_sanitize(trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''))) ?></td>
                             <td><?= app_sanitize($u['email'] ?? '') ?></td>
                             <td><?= app_sanitize($u['username'] ?? '') ?></td>
-                            <td><span class="pill <?= app_sanitize($u['role'] === 'admin' ? 'admin' : ($u['role'] ?? '')) ?>"><?= app_sanitize(ucfirst($u['role'] ?? '')) ?></span></td>
+                            <td><span class="pill <?= app_sanitize(in_array($u['role'], ['admin', 'superadmin']) ? $u['role'] : ($u['role'] ?? '')) ?>"><?= app_sanitize(ucfirst($u['role'] ?? '')) ?></span></td>
                             <td><?= app_sanitize($u['seller_status'] ?? '') ?></td>
                             <td><?= app_sanitize($u['store_name'] ?? '') ?></td>
                             <td><?= app_sanitize(isset($u['created_at']) ? date('M j, Y', strtotime($u['created_at'])) : '') ?></td>
                             <td>
                                 <div class="action-stack">
-                                    <button class="edit-btn" type="button"
+                                    <button class="edit-btn" type="button" title="Edit"
                                         data-modal-target="#userModal"
                                         data-modal-title="Edit User"
                                         data-modal-message="Update this user account."
@@ -85,13 +86,15 @@
                                             'seller_status' => $u['seller_status'] ?? 'not_applicable',
                                             'store_name'    => $u['store_name'] ?? '',
                                             'password'      => '',
-                                        ], JSON_UNESCAPED_UNICODE)) ?>'>Edit</button>
-                                    <button class="reject-btn" type="button"
+                                        ], JSON_UNESCAPED_UNICODE)) ?>'><i class="fa-solid fa-pencil"></i></button>
+                                    <?php if (app_can_delete_user($currentUser, $u)): ?>
+                                    <button class="reject-btn" type="button" title="Delete"
                                         data-modal-target="#deleteUserModal"
                                         data-modal-title="Delete User"
                                         data-modal-message="Permanently delete <?= app_sanitize($u['username'] ?? 'this user') ?>? This cannot be undone."
                                         data-modal-confirm="Delete"
-                                        data-modal-payload='<?= app_sanitize(json_encode(['user_id' => (int) $u['userId']])) ?>'>Delete</button>
+                                        data-modal-payload='<?= app_sanitize(json_encode(['user_id' => (int) $u['userId']])) ?>'><i class="fa-solid fa-trash"></i></button>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
@@ -131,18 +134,18 @@
                             <td><span class="pill pending">Pending</span></td>
                             <td>
                                 <div class="action-stack">
-                                    <button class="approve-btn" type="button"
+                                    <button class="approve-btn" type="button" title="Approve"
                                         data-modal-target="#sellerActionModal"
                                         data-modal-title="Approve Seller Application"
                                         data-modal-message="Approve <?= app_sanitize($app['first_name'] . ' ' . $app['last_name']) ?> for store <?= app_sanitize($app['store_name']) ?>? Their account will be promoted to seller and they'll receive a notification email."
                                         data-modal-confirm="Approve"
-                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'approve_seller', 'application_id' => (int) $app['app_id']])) ?>'>Approve</button>
-                                    <button class="reject-btn" type="button"
+                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'approve_seller', 'application_id' => (int) $app['app_id']])) ?>'><i class="fa-solid fa-check"></i></button>
+                                    <button class="reject-btn" type="button" title="Reject"
                                         data-modal-target="#rejectSellerModal"
                                         data-modal-title="Reject Application"
                                         data-modal-message="Reject <?= app_sanitize($app['first_name'] . ' ' . $app['last_name']) ?>'s application for <?= app_sanitize($app['store_name']) ?>? You can provide a reason — the applicant will be notified and may resubmit."
                                         data-modal-confirm="Reject Application"
-                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'reject_seller', 'application_id' => (int) $app['app_id']])) ?>'>Reject</button>
+                                        data-modal-payload='<?= app_sanitize(json_encode(['action' => 'reject_seller', 'application_id' => (int) $app['app_id']])) ?>'><i class="fa-solid fa-xmark"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -173,12 +176,12 @@
                             <td><span class="pill <?= app_sanitize($order['status']) ?>"><?= app_sanitize(ucfirst($order['status'])) ?></span></td>
                             <td><?= app_sanitize($order['created_at']) ?></td>
                             <td>
-                                <button class="status-btn" type="button"
+                                <button class="status-btn" type="button" title="Update Status"
                                     data-modal-target="#orderStatusModal"
                                     data-modal-title="Update Order Status"
                                     data-modal-message="Change the status for order #<?= (int) $order['orderId'] ?>."
                                     data-modal-confirm="Save Status"
-                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'>Update</button>
+                                    data-modal-payload='<?= app_sanitize(json_encode(['action' => 'update_order_status', 'order_id' => (int) $order['orderId'], 'status' => $order['status']])) ?>'><i class="fa-solid fa-pen-to-square"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -196,7 +199,7 @@
                 <div class="p-4">No products available.</div>
             <?php else: ?>
                 <table id="productsTable" class="table table-sm w-100 mb-0">
-                    <thead><tr><th>ID</th><th>Name</th><th>Seller</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Name</th><th>Seller</th><th>Brand</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>
                     <?php foreach ($adminProducts as $product): ?>
                         <tr>
@@ -208,6 +211,25 @@
                             <td>₱<?= number_format((float) $product['price'], 2) ?></td>
                             <td><?= (int) $product['stock'] ?></td>
                             <td><span class="pill <?= (int) $product['is_active'] ? 'completed' : 'cancelled' ?>"><?= (int) $product['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                            <td>
+                                <div class="action-stack">
+                                    <?php if ((int) $product['is_active']): ?>
+                                        <button class="reject-btn" type="button" title="Hide"
+                                            data-modal-target="#hideProductModal"
+                                            data-modal-title="Hide Product"
+                                            data-modal-message="Hide <?= app_sanitize($product['name']) ?>? This will remove it from the store. Provide a reason."
+                                            data-modal-confirm="Hide Product"
+                                            data-modal-payload='<?= app_sanitize(json_encode(['action' => 'hide_product', 'product_id' => (int) $product['productId'], 'hide' => '1'])) ?>'><i class="fa-solid fa-eye-slash"></i></button>
+                                    <?php else: ?>
+                                        <button class="approve-btn" type="button" title="Unhide"
+                                            data-modal-target="#hideProductModal"
+                                            data-modal-title="Unhide Product"
+                                            data-modal-message="Unhide <?= app_sanitize($product['name']) ?>? This will make it visible in the store again."
+                                            data-modal-confirm="Unhide Product"
+                                            data-modal-payload='<?= app_sanitize(json_encode(['action' => 'hide_product', 'product_id' => (int) $product['productId'], 'hide' => '0'])) ?>'><i class="fa-solid fa-eye"></i></button>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

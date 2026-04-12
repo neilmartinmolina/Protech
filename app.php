@@ -274,10 +274,10 @@ function app_ensure_schema(mysqli $conn): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    // ── Promote admin user ────────────────────────────────────────────────────
-    $adminEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : 'neilmartinmolina@gmail.com';
-    $stmt = $conn->prepare("UPDATE users SET role = 'admin', seller_status = 'approved' WHERE email = ?");
-    $stmt->bind_param('s', $adminEmail);
+    // ── Promote superadmin user ─────────────────────────────────────────────────
+    $superadminEmail = defined('SUPERADMIN_EMAIL') ? SUPERADMIN_EMAIL : 'neilmartinmolina@gmail.com';
+    $stmt = $conn->prepare("UPDATE users SET role = 'superadmin', seller_status = 'approved' WHERE email = ?");
+    $stmt->bind_param('s', $superadminEmail);
     $stmt->execute();
     $stmt->close();
 
@@ -420,7 +420,34 @@ function app_require_login(): array
 
 function app_is_admin(array $user): bool
 {
-    return ($user['role'] ?? '') === 'admin';
+    $role = $user['role'] ?? '';
+    return $role === 'admin' || $role === 'superadmin';
+}
+
+function app_is_superadmin(array $user): bool
+{
+    return ($user['role'] ?? '') === 'superadmin';
+}
+
+function app_can_add_admin(array $actor): bool
+{
+    return app_is_superadmin($actor);
+}
+
+function app_can_delete_user(array $actor, array $target): bool
+{
+    $actorRole = $actor['role'] ?? '';
+    $targetRole = $target['role'] ?? '';
+
+    if (app_is_superadmin($actor)) {
+        return $targetRole !== 'superadmin';
+    }
+
+    if (app_is_admin($actor)) {
+        return $targetRole !== 'admin' && $targetRole !== 'superadmin';
+    }
+
+    return false;
 }
 
 function app_is_seller(array $user): bool

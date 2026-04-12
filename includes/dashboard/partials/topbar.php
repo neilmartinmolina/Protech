@@ -7,7 +7,7 @@
 <div class="admin-topbar">
     <div>
         <h1><?= app_sanitize($allowedTabs[$tab][0]) ?></h1>
-        <span class="breadcrumb-text"><?= $role === 'admin' ? 'Overview of platform users, sellers, products, orders, and approvals' : 'Store: ' . app_sanitize($user['store_name'] ?: $user['username']) ?></span>
+        <span class="breadcrumb-text"><?= ($role === 'admin' || $role === 'superadmin') ? 'Overview of platform users, sellers, products, orders, and approvals' : 'Store: ' . app_sanitize($user['store_name'] ?: $user['username']) ?></span>
     </div>
     <div class="topbar-actions">
         <button class="topbar-btn d-lg-none" id="sidebarToggle"><i class="fa-solid fa-bars"></i></button>

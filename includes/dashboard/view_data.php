@@ -25,6 +25,16 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
             'activity_logs'  => ['Activity Logs',    'fa-solid fa-clock-rotate-left'],
             'general'        => ['General',          'fa-solid fa-gear'],
         ],
+        'superadmin' => [
+            'dashboard'      => ['Dashboard',        'fa-solid fa-house'],
+            'users'          => ['Users',            'fa-solid fa-users'],
+            'sellers'        => ['Seller Approvals', 'fa-solid fa-user-check'],
+            'orders'         => ['Orders',           'fa-solid fa-receipt'],
+            'products'       => ['Products',         'fa-solid fa-box'],
+            'notifications'  => ['Notifications',    'fa-solid fa-bell'],
+            'activity_logs'  => ['Activity Logs',    'fa-solid fa-clock-rotate-left'],
+            'general'        => ['General',          'fa-solid fa-gear'],
+        ],
         'seller' => [
             'dashboard'      => ['Dashboard',        'fa-solid fa-house'],
             'products'       => ['Products',         'fa-solid fa-box'],
@@ -86,7 +96,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
     // ------------------------------------------------------------------
     // Admin data
     // ------------------------------------------------------------------
-    if ($role === 'admin') {
+    if ($role === 'admin' || $role === 'superadmin') {
         $queries = [
             'users'           => "SELECT COUNT(*) AS c FROM users WHERE role = 'customer'",
             'sellers'         => "SELECT COUNT(*) AS c FROM users WHERE role = 'seller' AND seller_status = 'approved'",
@@ -241,7 +251,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
         $sellerRevenueByDay[$label] = 0;
     }
 
-    if ($role === 'admin') {
+    if ($role === 'admin' || $role === 'superadmin') {
         $chartRows = $conn->query('
             SELECT DATE(created_at) AS order_day, COUNT(*) AS total
             FROM orders

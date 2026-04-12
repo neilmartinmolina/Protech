@@ -8,7 +8,7 @@ require_once __DIR__ . '/includes/dashboard/view_data.php';
 $user = app_require_login();
 $role = $user['role'] ?? 'customer';
 
-if ($role !== 'admin') {
+if ($role !== 'admin' && $role !== 'superadmin') {
     header('Location: index.php');
     exit;
 }
@@ -18,7 +18,7 @@ $view = dashboard_build_view_data($conn, $user, $role);
 extract($view, EXTR_SKIP);
 
 $tab = 'about_dev';
-// Add this page to the same variable contract expected by sidebar/topbar.
+
 $allowedTabs['about_dev'] = ['About Developer', 'fa-solid fa-circle-user'];
 
 $pageTitle  = 'About Developer — ProTech';
