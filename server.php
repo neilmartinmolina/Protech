@@ -174,27 +174,13 @@ try {
     exit;
 }
 
-// ── Set session ───────────────────────────────────────────────────────────────
+// ── Success: do NOT auto-login - user must verify email first ────────
 $verifyUrl = rtrim(SITE_URL, '/') . '/verify.php?token=' . urlencode($verifyToken);
 
-$_SESSION['user'] = [
-    'userId'        => $userId,
-    'firstName'     => $firstName,
-    'lastName'      => $lastName,
-    'username'      => $username,
-    'email'         => $email,
-    'role'          => $role,
-    'seller_status' => $sellerStatus,
-    'store_name'    => $storeName,
-    'avatar_path'   => $avatarPath,
-];
-
-// ── Send emails ───────────────────────────────────────────────────────────────
-$displayName  = app_sanitize($firstName . ' ' . $lastName);
-$safeEmail    = app_sanitize($email);
-$safeUsername = app_sanitize($username);
-$safeStore    = app_sanitize($storeName);
-$signupTime   = date('F j, Y \a\t g:i A');
+echo json_encode([
+    'success' => true,
+    'message' => 'Account created! Please check your email to verify your account before signing in.',
+]);
 
 try {
     $mail = create_mailer();
@@ -250,13 +236,5 @@ try {
     $admin->send();
 
 } catch (Exception $e) {
-    // Email failure is non-fatal — user is already created
     error_log('Signup email failed: ' . $e->getMessage());
 }
-
-// ── Success ───────────────────────────────────────────────────────────────────
-$message = $role === 'seller'
-    ? 'Seller account created. Verify your email first, then wait for admin approval.'
-    : 'Account created. Check your email and click the verification link to activate your account.';
-
-echo json_encode(['success' => true, 'message' => $message]);

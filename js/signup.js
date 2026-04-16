@@ -184,13 +184,9 @@
                 icon: 'success',
                 title: 'Account created',
                 text: data.message || 'Your account has been created successfully.',
-                confirmButtonText: 'Great'
+                confirmButtonText: 'Go to Login'
             });
-            form.reset();
-            form.querySelectorAll('.form-control').forEach(clearState);
-            strengthBar.style.width   = '0%';
-            strengthLabel.textContent = '';
-            submitBtn.textContent     = 'Account Created!';
+            window.location.href = 'login.php';
         } else {
             const msg = data.errors ? data.errors.join(' ') : (data.message || 'Something went wrong.');
             await Swal.fire({

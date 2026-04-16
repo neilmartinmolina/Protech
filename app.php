@@ -2,10 +2,8 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/activity_log.php';
 
-function app_db(): mysqli
-{
+function app_db(): mysqli{
     static $conn = null;
-
     if ($conn instanceof mysqli) {
         return $conn;
     }
@@ -406,8 +404,7 @@ function app_refresh_session_user(int $userId): ?array
     return $_SESSION['user'];
 }
 
-function app_require_login(): array
-{
+function app_require_login(): array{
     $user = app_current_user();
 
     if (!$user) {
@@ -418,19 +415,16 @@ function app_require_login(): array
     return app_refresh_session_user((int) $user['userId']) ?? $user;
 }
 
-function app_is_admin(array $user): bool
-{
+function app_is_admin(array $user): bool{
     $role = $user['role'] ?? '';
     return $role === 'admin' || $role === 'superadmin';
 }
 
-function app_is_superadmin(array $user): bool
-{
+function app_is_superadmin(array $user): bool{
     return ($user['role'] ?? '') === 'superadmin';
 }
 
-function app_can_add_admin(array $actor): bool
-{
+function app_can_add_admin(array $actor): bool{
     return app_is_superadmin($actor);
 }
 
