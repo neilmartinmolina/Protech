@@ -61,7 +61,7 @@ if ($navUser && ($navUser['role'] ?? '') === 'seller') {
                             <?php if ($showDashboardLink): ?>
                                 <li><a class="dropdown-item" href="dashboard.php"><i class="fa-solid fa-table-columns me-2"></i><?= app_sanitize($dashboardLabel) ?></a></li>
                             <?php endif; ?>
-                            <li><a class="dropdown-item" href="myprofile.php"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
+                            <li><a class="dropdown-item" href="profile.php"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="logout.php"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Logout</a></li>
                         </ul>

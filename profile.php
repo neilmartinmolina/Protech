@@ -3,43 +3,16 @@ require_once __DIR__ . '/app.php';
 
 $user = app_require_login();
 $conn = app_db();
-$flash = null;
-$errors = [];
-$openEditForm = false;
+
+$activeSection = $_GET['section'] ?? 'general';
+$allowedSections = ['general', 'settings', 'security', 'orders'];
+if (!in_array($activeSection, $allowedSections)) {
+    $activeSection = 'general';
+}
+
 $avatarUrl = app_avatar_url($user);
 $customerOrders = app_get_orders_for_customer((int) $user['userId']);
 
-// Active section from query string; default to 'general'
-$activeSection = $_GET['section'] ?? 'general';
-$allowedSections = ['general', 'settings', 'security'];
-if (!in_array($activeSection, $allowedSections)) $activeSection = 'general';
-
-// Fetch latest seller application for this user (if any)
-$sellerApplication = null;
-if (($user['role'] ?? '') === 'customer') {
-    $stmt = $conn->prepare('SELECT * FROM seller_applications WHERE userId = ? ORDER BY created_at DESC LIMIT 1');
-    $stmt->bind_param('i', $user['userId']);
-    $stmt->execute();
-    $sellerApplication = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-}
-
-// Fetch saved addresses and payment methods
-$savedAddresses = [];
-$stmt = $conn->prepare('SELECT * FROM user_addresses WHERE userId = ? ORDER BY is_default DESC, created_at DESC');
-$stmt->bind_param('i', $user['userId']);
-$stmt->execute();
-$savedAddresses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-$paymentMethods = [];
-$stmt = $conn->prepare('SELECT * FROM user_payment_methods WHERE userId = ? ORDER BY is_default DESC, created_at DESC');
-$stmt->bind_param('i', $user['userId']);
-$stmt->execute();
-$paymentMethods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-// Fetch completed orders eligible for rating (placed/processing/delivered)
 $rateableOrders = [];
 foreach ($customerOrders as $order) {
     if (in_array($order['status'], ['placed', 'processing', 'delivered'])) {
@@ -47,172 +20,29 @@ foreach ($customerOrders as $order) {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+$flash = null;
+$errors = [];
+$openEditForm = false;
 
-    // ── Update profile ──────────────────────────────────────
-    if ($action === 'update_profile') {
-        $activeSection = 'general';
-        $openEditForm  = true;
-        $firstName  = trim($_POST['first_name']  ?? '');
-        $lastName   = trim($_POST['last_name']   ?? '');
-        $username   = trim($_POST['username']    ?? '');
-        $avatarFile = $_FILES['avatar'] ?? null;
+require_once __DIR__ . '/includes/profile_handler.php';
 
-        if ($firstName === '') $errors[] = 'First name is required.';
-        if ($lastName  === '') $errors[] = 'Last name is required.';
-        if (!preg_match('/^[a-zA-Z0-9_]{3,50}$/', $username)) $errors[] = 'Username must be 3–50 characters (letters, numbers, underscores only).';
+$postResult = profile_process_post($conn, $user);
+$flash = $postResult['flash'];
+$errors = $postResult['errors'];
+$openEditForm = $postResult['openEditForm'];
+$user = $postResult['user'];
 
-        $avatarResult = ['success' => true, 'path' => $user['avatar_path'] ?? null];
-
-        if (!$errors) {
-            $stmt = $conn->prepare('SELECT userId FROM users WHERE username = ? AND userId <> ? LIMIT 1');
-            $stmt->bind_param('si', $username, $user['userId']);
-            $stmt->execute();
-            $exists = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-            if ($exists) $errors[] = 'That username is already taken.';
-        }
-
-        if (!$errors && $avatarFile && ($avatarFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            $avatarResult = app_store_avatar($avatarFile, $user['avatar_path'] ?? null);
-            if (!$avatarResult['success']) $errors[] = $avatarResult['message'];
-        }
-
-        if (!$errors) {
-            $avatarPath = $avatarResult['path'] ?? ($user['avatar_path'] ?? null);
-            $stmt = $conn->prepare('UPDATE users SET first_name=?, last_name=?, username=?, avatar_path=? WHERE userId=?');
-            $stmt->bind_param('ssssi', $firstName, $lastName, $username, $avatarPath, $user['userId']);
-            $stmt->execute();
-            $stmt->close();
-
-            $user      = app_refresh_session_user((int) $user['userId']) ?? $user;
-            $avatarUrl = app_avatar_url($user);
-            $flash     = ['type' => 'success', 'message' => 'Profile updated successfully.'];
-            $openEditForm = false;
-        }
-    }
-
-    // ── Change email (Security tab) ─────────────────────────
-    if ($action === 'change_email') {
-        $activeSection   = 'security';
-        $newEmail        = trim($_POST['new_email']        ?? '');
-        $confirmPassword = $_POST['confirm_password_email'] ?? '';
-
-        if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) $errors[] = 'A valid email address is required.';
-        if ($confirmPassword === '') $errors[] = 'Please confirm your password to change email.';
-
-        if (!$errors) {
-            $stmt = $conn->prepare('SELECT userId FROM users WHERE email = ? AND userId <> ? LIMIT 1');
-            $stmt->bind_param('si', $newEmail, $user['userId']);
-            $stmt->execute();
-            if ($stmt->get_result()->fetch_assoc()) $errors[] = 'That email is already in use by another account.';
-            $stmt->close();
-        }
-
-        if (!$errors) {
-            $stmt = $conn->prepare('SELECT password_hash FROM users WHERE userId = ? LIMIT 1');
-            $stmt->bind_param('i', $user['userId']);
-            $stmt->execute();
-            $account = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-            if (!$account || !password_verify($confirmPassword, $account['password_hash'])) {
-                $errors[] = 'Password is incorrect.';
-            }
-        }
-
-        if (!$errors) {
-            $stmt = $conn->prepare('UPDATE users SET email = ? WHERE userId = ?');
-            $stmt->bind_param('si', $newEmail, $user['userId']);
-            $stmt->execute();
-            $stmt->close();
-            $user  = app_refresh_session_user((int) $user['userId']) ?? $user;
-            $flash = ['type' => 'success', 'message' => 'Email updated successfully.'];
-        }
-    }
-
-    // ── Seller application ──────────────────────────────────
-    if ($action === 'apply_seller') {
-        $activeSection  = 'settings';
-        $applyStoreName = trim($_POST['store_name'] ?? '');
-        $applyReason    = trim($_POST['reason']     ?? '');
-
-        if ($applyStoreName === '') $errors[] = 'Store name is required.';
-        if (strlen($applyStoreName) > 150) $errors[] = 'Store name must be 150 characters or less.';
-
-        if (!$errors) {
-            $stmt = $conn->prepare("SELECT status FROM seller_applications WHERE userId = ? AND status = 'pending' LIMIT 1");
-            $stmt->bind_param('i', $user['userId']);
-            $stmt->execute();
-            if ($stmt->get_result()->fetch_assoc()) $errors[] = 'You already have a pending application.';
-            $stmt->close();
-        }
-
-        if (!$errors && ($user['role'] ?? '') !== 'customer') {
-            $errors[] = 'Only customers can apply to become a seller.';
-        }
-
-        if (!$errors) {
-            $stmt = $conn->prepare("INSERT INTO seller_applications (userId, store_name, reason, status) VALUES (?, ?, ?, 'pending')");
-            $stmt->bind_param('iss', $user['userId'], $applyStoreName, $applyReason);
-            $stmt->execute();
-            $stmt->close();
-
-            $stmt = $conn->prepare("UPDATE users SET seller_status = 'pending' WHERE userId = ?");
-            $stmt->bind_param('i', $user['userId']);
-            $stmt->execute();
-            $stmt->close();
-
-            $user = app_refresh_session_user((int) $user['userId']) ?? $user;
-
-            $stmt = $conn->prepare('SELECT * FROM seller_applications WHERE userId = ? ORDER BY created_at DESC LIMIT 1');
-            $stmt->bind_param('i', $user['userId']);
-            $stmt->execute();
-            $sellerApplication = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-
-            $flash = ['type' => 'success', 'message' => 'Your seller application has been submitted. We\'ll review it shortly.'];
-        }
-    }
-
-    // ── Change password ─────────────────────────────────────
-    if ($action === 'change_password') {
-        $activeSection   = 'security';
-        $currentPassword = $_POST['current_password'] ?? '';
-        $newPassword     = $_POST['new_password']     ?? '';
-        $confirmPassword = $_POST['confirm_password'] ?? '';
-
-        if ($currentPassword === '')           $errors[] = 'Current password is required.';
-        if (strlen($newPassword) < 6)          $errors[] = 'New password must be at least 6 characters.';
-        if ($newPassword !== $confirmPassword) $errors[] = 'New password and confirmation do not match.';
-
-        $stmt = $conn->prepare('SELECT password_hash FROM users WHERE userId = ? LIMIT 1');
-        $stmt->bind_param('i', $user['userId']);
-        $stmt->execute();
-        $account = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        if (!$account || !password_verify($currentPassword, $account['password_hash'])) {
-            $errors[] = 'Current password is incorrect.';
-        }
-
-        if (!$errors) {
-            $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
-            $stmt = $conn->prepare('UPDATE users SET password_hash = ?, temp_password = NULL WHERE userId = ?');
-            $stmt->bind_param('si', $newHash, $user['userId']);
-            $stmt->execute();
-            $stmt->close();
-            $flash = ['type' => 'success', 'message' => 'Password changed successfully.'];
-        }
-    }
-
-    if ($errors) {
-        $flash = ['type' => 'danger', 'message' => implode(' ', $errors)];
-    }
+if ($flash && $flash['type'] === 'success') {
+    $activeSection = $postResult['activeSection'];
 }
 
+$profileData = profile_get_data($conn, $user);
+$savedAddresses = $profileData['savedAddresses'];
+$paymentMethods = $profileData['paymentMethods'];
+$sellerApplication = $profileData['sellerApplication'];
+
 $pageTitle = 'My Profile — ProTech';
-$pageCss   = ['my_profile.css'];
+$pageCss = ['my_profile.css'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -226,7 +56,6 @@ $pageCss   = ['my_profile.css'];
     <div class="container">
         <div class="profile-layout">
 
-            <!-- ═══ SIDEBAR ════════════════════════════════════ -->
             <aside class="profile-sidebar">
                 <div class="sidebar-user">
                     <div class="sidebar-avatar">
@@ -240,25 +69,21 @@ $pageCss   = ['my_profile.css'];
                     <div class="sidebar-role"><?= app_sanitize($user['role']) ?> account</div>
                 </div>
                 <ul class="sidebar-nav">
-                    <li class="sidebar-nav-section">MyAccount</li>
-                    <li><a href="?section=general"  class="<?= $activeSection === 'general'  ? 'active' : '' ?>"><i class="fa-solid fa-user"></i> General</a></li>
+                    <li class="sidebar-nav-section">Account Settings</li>
+                    <li><a href="?section=general" class="<?= $activeSection === 'general' ? 'active' : '' ?>"><i class="fa-solid fa-user"></i> General</a></li>
                     <li><a href="?section=settings" class="<?= $activeSection === 'settings' ? 'active' : '' ?>"><i class="fa-solid fa-gear"></i> Settings</a></li>
+                    <li><a href="?section=orders" class="<?= $activeSection === 'orders' ? 'active' : '' ?>"><i class="fa-solid fa-box"></i> Orders</a></li>
                     <li><a href="?section=security" class="<?= $activeSection === 'security' ? 'active' : '' ?>"><i class="fa-solid fa-lock"></i> Security</a></li>
                 </ul>
             </aside>
 
-            <!-- ═══ MAIN CONTENT ═══════════════════════════════ -->
             <main>
                 <?php if ($flash): ?>
                     <div class="flash <?= app_sanitize($flash['type']) ?>"><?= app_sanitize($flash['message']) ?></div>
                 <?php endif; ?>
 
-                <!-- ══════════════════════════════════════════════
-                     GENERAL TAB
-                ══════════════════════════════════════════════ -->
                 <?php if ($activeSection === 'general'): ?>
 
-                    <!-- Profile card -->
                     <div class="profile-card">
                         <div class="card-header-row">
                             <div>
@@ -278,7 +103,6 @@ $pageCss   = ['my_profile.css'];
                             <?php endif; ?>
                         </div>
 
-                        <!-- Edit form — email removed, handled in Security -->
                         <div class="form-shell <?= $openEditForm ? 'open' : '' ?>" id="editFormShell">
                             <hr class="my-4" style="border-color:var(--border);">
                             <form method="post" enctype="multipart/form-data">
@@ -321,10 +145,7 @@ $pageCss   = ['my_profile.css'];
                         </div>
                     </div>
 
-                    <!-- My Orders + Rate — side by side on larger screens -->
                     <div class="row g-4">
-
-                        <!-- My Orders -->
                         <div class="col-lg-6">
                             <div class="profile-card h-100">
                                 <div class="card-header-row">
@@ -355,7 +176,6 @@ $pageCss   = ['my_profile.css'];
                             </div>
                         </div>
 
-                        <!-- Rate Products -->
                         <div class="col-lg-6">
                             <div class="profile-card h-100">
                                 <div class="card-header-row">
@@ -378,36 +198,24 @@ $pageCss   = ['my_profile.css'];
                                                     <strong class="d-block mt-1">₱<?= number_format((float) $order['total_amount'], 2) ?></strong>
                                                     <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
                                                 </div>
-                                                <button
-                                                    class="ghost-btn rate-order-btn"
-                                                    type="button"
-                                                    data-order-id="<?= (int) $order['orderId'] ?>"
-                                                    style="font-size:.8rem; padding:.3rem .75rem;"
-                                                >
-                                                    Rate
-                                                </button>
+                                                <button class="ghost-btn rate-order-btn" type="button" data-order-id="<?= (int) $order['orderId'] ?>" style="font-size:.8rem; padding:.3rem .75rem;">Rate</button>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
                             </div>
                         </div>
+                    </div>
 
-                    </div><!-- /row -->
-
-                <!-- ══════════════════════════════════════════════
-                     SETTINGS TAB
-                ══════════════════════════════════════════════ -->
                 <?php elseif ($activeSection === 'settings'): ?>
 
-                    <!-- Saved Addresses -->
                     <div class="profile-card">
                         <div class="card-header-row">
                             <div>
                                 <div class="section-label mb-1"><i class="fa-solid fa-location-dot"></i> Addresses</div>
                                 <h2 class="section-title mb-0" style="font-size:1.4rem;">Saved Addresses</h2>
                             </div>
-                            <button class="ghost-btn" type="button">+ Add Address</button>
+                            <button class="ghost-btn" type="button" data-bs-toggle="modal" data-bs-target="#addAddressModal">+ Add Address</button>
                         </div>
                         <?php if (empty($savedAddresses)): ?>
                             <div class="empty-state">
@@ -430,24 +238,36 @@ $pageCss   = ['my_profile.css'];
                                                 <?= app_sanitize($addr['street']) ?>, <?= app_sanitize($addr['barangay']) ?>,
                                                 <?= app_sanitize($addr['city']) ?>
                                                 <?= $addr['province'] ? ', ' . app_sanitize($addr['province']) : '' ?>
-                                                <?= $addr['zip']      ? ' ' . app_sanitize($addr['zip'])      : '' ?>
+                                                <?= $addr['zip'] ? ' ' . app_sanitize($addr['zip']) : '' ?>
                                             </div>
                                         </div>
-                                        <button class="ghost-btn" type="button" style="font-size:.8rem; padding:.3rem .75rem;">Edit</button>
+                                        <div class="d-flex gap-2">
+                                            <?php if (!$addr['is_default']): ?>
+                                                <form method="post" style="display:inline;">
+                                                    <input type="hidden" name="action" value="set_default_address">
+                                                    <input type="hidden" name="address_id" value="<?= (int) $addr['userAddressId'] ?>">
+                                                    <button type="submit" class="ghost-btn" style="font-size:.75rem; padding:.25rem .5rem;">Set Default</button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <form method="post" style="display:inline;" onsubmit="return confirm('Delete this address?');">
+                                                <input type="hidden" name="action" value="delete_address">
+                                                <input type="hidden" name="address_id" value="<?= (int) $addr['userAddressId'] ?>">
+                                                <button type="submit" class="ghost-btn" style="font-size:.75rem; padding:.25rem .5rem; color:var(--danger);">Delete</button>
+                                            </form>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
                     </div>
 
-                    <!-- Mode of Payment -->
                     <div class="profile-card">
                         <div class="card-header-row">
                             <div>
                                 <div class="section-label mb-1"><i class="fa-solid fa-credit-card"></i> Payment</div>
                                 <h2 class="section-title mb-0" style="font-size:1.4rem;">Mode of Payment</h2>
                             </div>
-                            <button class="ghost-btn" type="button">+ Add Payment</button>
+                            <button class="ghost-btn" type="button" data-bs-toggle="modal" data-bs-target="#addPaymentModal">+ Add Payment</button>
                         </div>
                         <?php if (empty($paymentMethods)): ?>
                             <div class="empty-state">
@@ -472,14 +292,26 @@ $pageCss   = ['my_profile.css'];
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                        <button class="ghost-btn" type="button" style="font-size:.8rem; padding:.3rem .75rem;">Edit</button>
+                                        <div class="d-flex gap-2">
+                                            <?php if (!$method['is_default']): ?>
+                                                <form method="post" style="display:inline;">
+                                                    <input type="hidden" name="action" value="set_default_payment">
+                                                    <input type="hidden" name="payment_id" value="<?= (int) $method['userPaymentMethodId'] ?>">
+                                                    <button type="submit" class="ghost-btn" style="font-size:.75rem; padding:.25rem .5rem;">Set Default</button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <form method="post" style="display:inline;" onsubmit="return confirm('Delete this payment method?');">
+                                                <input type="hidden" name="action" value="delete_payment">
+                                                <input type="hidden" name="payment_id" value="<?= (int) $method['userPaymentMethodId'] ?>">
+                                                <button type="submit" class="ghost-btn" style="font-size:.75rem; padding:.25rem .5rem; color:var(--danger);">Delete</button>
+                                            </form>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
                     </div>
 
-                    <!-- Become a Seller — customers only, revealed by button -->
                     <?php if (($user['role'] ?? '') === 'customer'): ?>
                         <div class="profile-card">
                             <div class="card-header-row">
@@ -492,7 +324,6 @@ $pageCss   = ['my_profile.css'];
                                 </button>
                             </div>
 
-                            <!-- Collapsed by default -->
                             <div id="sellerFormShell" style="display:none;">
                                 <?php
                                 $appStatus = $sellerApplication['status'] ?? null;
@@ -574,16 +405,42 @@ $pageCss   = ['my_profile.css'];
                                         </div>
                                     </form>
                                 <?php endif; ?>
-                            </div><!-- /sellerFormShell -->
+                            </div>
                         </div>
                     <?php endif; ?>
 
-                <!-- ══════════════════════════════════════════════
-                     SECURITY TAB
-                ══════════════════════════════════════════════ -->
+                <?php elseif ($activeSection === 'orders'): ?>
+
+                    <div class="profile-card">
+                        <div class="card-header-row">
+                            <div>
+                                <div class="section-label mb-1"><i class="fa-solid fa-box"></i> Orders</div>
+                                <h2 class="section-title mb-0" style="font-size:1.4rem;">My Orders</h2>
+                            </div>
+                        </div>
+                        <?php if (empty($customerOrders)): ?>
+                            <div class="empty-state">
+                                <i class="fa-solid fa-box-open"></i>
+                                You haven't placed any orders yet.
+                            </div>
+                        <?php else: ?>
+                            <div class="d-flex flex-column gap-3">
+                                <?php foreach ($customerOrders as $order): ?>
+                                    <div class="detail-item d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                        <div>
+                                            <small>Order #<?= (int) $order['orderId'] ?> &bull; <?= app_sanitize($order['created_at']) ?></small>
+                                            <strong class="d-block mt-1">₱<?= number_format((float) $order['total_amount'], 2) ?></strong>
+                                            <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
+                                        </div>
+                                        <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
                 <?php elseif ($activeSection === 'security'): ?>
 
-                    <!-- Change Email -->
                     <div class="profile-card">
                         <div class="card-header-row">
                             <div>
@@ -609,7 +466,6 @@ $pageCss   = ['my_profile.css'];
                         </form>
                     </div>
 
-                    <!-- Change Password -->
                     <div class="profile-card">
                         <div class="card-header-row">
                             <div>
@@ -644,35 +500,148 @@ $pageCss   = ['my_profile.css'];
 </section>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+
+<div class="modal" id="addAddressModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Address</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add_address">
+                    <div class="mb-3">
+                        <label class="form-label">Label <span class="text-secondary">(optional)</span></label>
+                        <input class="form-control" type="text" name="label" placeholder="e.g. Home, Work">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Recipient Name <span class="text-danger">*</span></label>
+                        <input class="form-control" type="text" name="recipient_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                        <input class="form-control" type="tel" name="phone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Street Address <span class="text-danger">*</span></label>
+                        <input class="form-control" type="text" name="street" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Barangay <span class="text-danger">*</span></label>
+                        <input class="form-control" type="text" name="barangay" required>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">City <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" name="city" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Province</label>
+                            <input class="form-control" type="text" name="province">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ZIP Code</label>
+                        <input class="form-control" type="text" name="zip">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="set_default" id="setDefaultAddr">
+                        <label class="form-check-label" for="setDefaultAddr">Set as default address</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ghost-btn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="action-btn">Save Address</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="addPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Payment Method</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add_payment">
+                    <div class="mb-3">
+                        <label class="form-label">Payment Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="payment_type" id="paymentTypeSelect" required>
+                            <option value="">Select type...</option>
+                            <option value="gcash">GCash</option>
+                            <option value="cod">Cash on Delivery</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Label <span class="text-secondary">(optional)</span></label>
+                        <input class="form-control" type="text" name="label" placeholder="e.g. Personal GCash">
+                    </div>
+                    <div id="gcashFields" style="display:none;">
+                        <div class="mb-3">
+                            <label class="form-label">GCash Name <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" name="gcash_name">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">GCash Number <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" name="gcash_number" pattern="[0-9]{11}" placeholder="09123456789">
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="set_default" id="setDefaultPay">
+                        <label class="form-check-label" for="setDefaultPay">Set as default payment method</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="ghost-btn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="action-btn">Save Payment Method</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php include __DIR__ . '/includes/scripts.php'; ?>
 <script>
 (() => {
-    // ── Edit profile form toggle ──────────────────────────────
     const editShell = document.getElementById('editFormShell');
     const toggleBtn = document.getElementById('toggleEditBtn');
     const cancelBtn = document.getElementById('cancelEditBtn');
     toggleBtn?.addEventListener('click', () => editShell?.classList.toggle('open'));
     cancelBtn?.addEventListener('click', () => editShell?.classList.remove('open'));
 
-    // ── Seller section reveal ─────────────────────────────────
-    const sellerShell   = document.getElementById('sellerFormShell');
-    const sellerToggle  = document.getElementById('toggleSellerBtn');
+    const sellerShell = document.getElementById('sellerFormShell');
+    const sellerToggle = document.getElementById('toggleSellerBtn');
     const sellerChevron = document.getElementById('sellerChevron');
     let sellerOpen = false;
 
     sellerToggle?.addEventListener('click', () => {
         sellerOpen = !sellerOpen;
-        sellerShell.style.display   = sellerOpen ? 'block' : 'none';
-        sellerToggle.innerHTML      = sellerOpen
+        sellerShell.style.display = sellerOpen ? 'block' : 'none';
+        sellerToggle.innerHTML = sellerOpen
             ? '<i class="fa-solid fa-chevron-up"></i> Hide'
             : '<i class="fa-solid fa-chevron-down"></i> Show';
     });
 
-    // ── Rate button stub ──────────────────────────────────────
+    const paymentTypeSelect = document.getElementById('paymentTypeSelect');
+    const gcashFields = document.getElementById('gcashFields');
+    paymentTypeSelect?.addEventListener('change', () => {
+        if (paymentTypeSelect.value === 'gcash') {
+            gcashFields.style.display = 'block';
+            gcashFields.querySelectorAll('input').forEach(i => i.required = true);
+        } else {
+            gcashFields.style.display = 'none';
+            gcashFields.querySelectorAll('input').forEach(i => i.required = false);
+        }
+    });
+
     document.querySelectorAll('.rate-order-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const orderId = btn.dataset.orderId;
-            // TODO: wire up to a rating modal or page
             alert('Rating for Order #' + orderId + ' — coming soon.');
         });
     });
