@@ -193,7 +193,16 @@
 
 <?php elseif ($tab === 'products'): ?>
     <div class="table-card">
-        <div class="table-card-header"><h5>All Products <span class="badge-count"><?= count($adminProducts) ?></span></h5></div>
+        <div class="table-card-header">
+            <h5>All Products <span class="badge-count"><?= count($adminProducts) ?></span></h5>
+            <button class="add-product-btn" type="button"
+                data-modal-target="#productModal"
+                data-modal-title="Add Product"
+                data-modal-message="Create a new product listing."
+                data-modal-confirm="Save Product">
+                Add Product
+            </button>
+        </div>
         <div class="table-card-body table-responsive">
             <?php if (!$adminProducts): ?>
                 <div class="p-4">No products available.</div>
@@ -213,6 +222,23 @@
                             <td><span class="pill <?= (int) $product['is_active'] ? 'completed' : 'cancelled' ?>"><?= (int) $product['is_active'] ? 'Active' : 'Inactive' ?></span></td>
                             <td>
                                 <div class="action-stack">
+                                    <button class="edit-btn" type="button" title="Edit"
+                                        data-modal-target="#productModal"
+                                        data-modal-title="Edit Product"
+                                        data-modal-message="Update this product."
+                                        data-modal-confirm="Save Product"
+                                        data-modal-payload='<?= app_sanitize(json_encode([
+                                            'action' => 'save_product',
+                                            'product_id' => (int) $product['productId'],
+                                            'name' => $product['name'],
+                                            'brand' => $product['brand'],
+                                            'category' => $product['category'],
+                                            'description' => $product['description'] ?? '',
+                                            'price' => $product['price'],
+                                            'stock' => (int) $product['stock'],
+                                            'icon_class' => $product['icon_class'] ?? 'fa-solid fa-box-open',
+                                            'is_active' => (int) $product['is_active']
+                                        ])) ?>'><i class="fa-solid fa-pencil"></i></button>
                                     <?php if ((int) $product['is_active']): ?>
                                         <button class="reject-btn" type="button" title="Hide"
                                             data-modal-target="#hideProductModal"

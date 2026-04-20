@@ -124,7 +124,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
         $adminOrders = app_get_orders_for_seller(null);
 
         $result = $conn->query('
-            SELECT p.productId, p.name,
+            SELECT p.productId, p.name, p.sellerUserId, p.description, p.icon_class,
                    b.name AS brand,
                    c.name AS category,
                    p.price, p.stock, p.is_active,
@@ -134,7 +134,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
                         WHERE sa.userId = u.userId AND sa.status = \'approved\'
                         ORDER BY sa.reviewed_at DESC
                         LIMIT 1),
-                       u.username,
+                       CASE WHEN u.role = \'superadmin\' THEN \'Protech\' ELSE u.username END,
                        \'Marketplace\'
                    ) AS seller_name
             FROM products p

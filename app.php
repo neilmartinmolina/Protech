@@ -195,6 +195,11 @@ function app_ensure_schema(mysqli $conn): void
             userId       INT(10) UNSIGNED  NOT NULL,
             total_amount DECIMAL(10,2)     NOT NULL DEFAULT 0.00,
             status       VARCHAR(30)       NOT NULL DEFAULT 'placed',
+            phone        VARCHAR(20)       DEFAULT NULL,
+            shipping_address TEXT          DEFAULT NULL,
+            tax          DECIMAL(10,2)     DEFAULT 0.00,
+            shipping_cost DECIMAL(10,2)    DEFAULT 0.00,
+            payment_method VARCHAR(50)     DEFAULT 'cod',
             created_at   DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_ord_userId       (userId),
             INDEX idx_ord_status       (status)
@@ -279,6 +284,17 @@ function app_ensure_schema(mysqli $conn): void
     $stmt->execute();
     $stmt->close();
 
+    // ── Get superadmin user ID for seed products ────────────────────────────────
+    $superadminId = null;
+    $saStmt = $conn->prepare("SELECT userId FROM users WHERE email = ? LIMIT 1");
+    $saStmt->bind_param('s', $superadminEmail);
+    $saStmt->execute();
+    $saResult = $saStmt->get_result()->fetch_assoc();
+    if ($saResult) {
+        $superadminId = (int) $saResult['userId'];
+    }
+    $saStmt->close();
+
     // ── Seed products ─────────────────────────────────────────────────────────
     $seedProducts = [
         ['ProBook X1 Ultra',         'Lenovo',   'Laptops',     '15.6-inch 4K OLED with Intel i9, 32GB RAM, and 1TB SSD.',                  1499.00, 15, 'fa-solid fa-laptop'],
@@ -307,8 +323,8 @@ function app_ensure_schema(mysqli $conn): void
     $getBrandId = $conn->prepare("SELECT brandId FROM brands WHERE name = ? LIMIT 1");
     $getCatId   = $conn->prepare("SELECT categoryId FROM categories WHERE name = ? LIMIT 1");
     $insertStmt = $conn->prepare("
-        INSERT INTO products (name, brandId, categoryId, description, price, stock, icon_class)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO products (sellerUserId, name, brandId, categoryId, description, price, stock, icon_class)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach ($seedProducts as [$name, $brand, $category, $description, $price, $stock, $iconClass]) {
@@ -328,8 +344,13 @@ function app_ensure_schema(mysqli $conn): void
         $catRow     = $getCatId->get_result()->fetch_assoc();
         $categoryId = $catRow['categoryId'] ?? null;
 
-        $insertStmt->bind_param('siisdis', $name, $brandId, $categoryId, $description, $price, $stock, $iconClass);
+        $insertStmt->bind_param('isiisdis', $superadminId, $name, $brandId, $categoryId, $description, $price, $stock, $iconClass);
         $insertStmt->execute();
+    }
+
+    // Link existing seed products (NULL sellerUserId) to superadmin store
+    if ($superadminId !== null) {
+        $conn->query("UPDATE products SET sellerUserId = {$superadminId} WHERE sellerUserId IS NULL");
     }
 
     $checkStmt->close();
@@ -750,7 +771,17 @@ function app_checkout(int $userId): array
             $grouped[$sellerKey]['total'] += $lineTotal;
         }
 
-        $orderStmt = $conn->prepare("INSERT INTO orders (userId, total_amount, status) VALUES (?, ?, 'placed')");
+        $orderStmt = $conn->prepare("INSERT INTO orders (userId, total_amount, status, phone, shipping_address, tax, shipping_cost, payment_method) VALUES (?, ?, 'placed', ?, ?, ?, ?, ?)");
+        
+        // Default values for order metadata
+        $phone = $_SESSION['checkout_phone'] ?? '';
+        $shippingAddress = $_SESSION['checkout_shipping_address'] ?? '';
+        $tax = $_SESSION['checkout_tax'] ?? 0.00;
+        $shippingCost = $_SESSION['checkout_shipping_cost'] ?? 0.00;
+        $paymentMethod = $_SESSION['checkout_payment_method'] ?? 'cod';
+        
+        // Clear session checkout data after use
+        unset($_SESSION['checkout_phone'], $_SESSION['checkout_shipping_address'], $_SESSION['checkout_tax'], $_SESSION['checkout_shipping_cost'], $_SESSION['checkout_payment_method']);
         $itemStmt             = $conn->prepare("INSERT INTO order_items (orderId, productId, sellerUserId, product_name, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)");
         $stockStmt            = $conn->prepare("UPDATE products SET stock = stock - ? WHERE productId = ?");
 
@@ -759,7 +790,7 @@ function app_checkout(int $userId): array
             $sellerId = $group['sellerUserId'];
             $total    = $group['total'];
 
-            $orderStmt->bind_param('id', $userId, $total);
+            $orderStmt->bind_param('idsdssss', $userId, $total, $phone, $shippingAddress, $tax, $shippingCost, $paymentMethod);
             $orderStmt->execute();
             $orderId           = (int) $conn->insert_id;
             $createdOrderIds[] = $orderId;
@@ -787,11 +818,182 @@ function app_checkout(int $userId): array
         $_SESSION['cart'] = [];
         $conn->commit();
 
+        // Store order IDs in session for checkout confirmation page
+        $_SESSION['checkout_order_ids'] = $createdOrderIds;
+
         return ['success' => true, 'message' => 'Checkout complete.', 'order_ids' => $createdOrderIds];
 
     } catch (Throwable $e) {
         $conn->rollback();
         return ['success' => false, 'message' => $e->getMessage()];
+    }
+}
+
+function app_get_order_with_items(int $orderId): ?array
+{
+    $conn = app_db();
+    $stmt = $conn->prepare("
+        SELECT o.orderId, o.userId, o.total_amount, o.status, o.created_at,
+               u.first_name, u.last_name, u.email
+        FROM orders o
+        JOIN users u ON u.userId = o.userId
+        WHERE o.orderId = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param('i', $orderId);
+    $stmt->execute();
+    $order = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$order) {
+        return null;
+    }
+
+    $itemStmt = $conn->prepare("
+        SELECT product_name, quantity, unit_price
+        FROM order_items
+        WHERE orderId = ?
+    ");
+    $itemStmt->bind_param('i', $orderId);
+    $itemStmt->execute();
+    $items = $itemStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $itemStmt->close();
+
+    $order['items'] = $items;
+    return $order;
+}
+
+function app_send_receipt_email(int $orderId): bool
+{
+    require_once __DIR__ . '/vendor/autoload.php';
+    require_once __DIR__ . '/includes/dashboard/mailer.php';
+
+    $order = app_get_order_with_items($orderId);
+    if (!$order) {
+        return false;
+    }
+
+    $customerName = $order['first_name'] . ' ' . $order['last_name'];
+    $customerEmail = $order['email'];
+    $orderDate = date('F j, Y', strtotime($order['created_at']));
+    $orderTime = date('g:i A', strtotime($order['created_at']));
+    $orderDateTime = $order['created_at'];
+
+    $itemsHtml = '';
+    $subtotal = 0;
+    foreach ($order['items'] as $item) {
+        $lineTotal = (float) $item['unit_price'] * (int) $item['quantity'];
+        $subtotal += $lineTotal;
+        $itemsHtml .= "
+            <tr>
+                <td style='padding:12px 8px;border-bottom:1px solid #2a2a2a;'>{$item['product_name']}</td>
+                <td style='padding:12px 8px;border-bottom:1px solid #2a2a2a;text-align:center;'>{$item['quantity']}</td>
+                <td style='padding:12px 8px;border-bottom:1px solid #2a2a2a;text-align:right;'>₱" . number_format($item['unit_price'], 2) . "</td>
+                <td style='padding:12px 8px;border-bottom:1px solid #2a2a2a;text-align:right;'>₱" . number_format($lineTotal, 2) . "</td>
+            </tr>
+        ";
+    }
+
+    $totalAmount = number_format((float) $order['total_amount'], 2);
+
+    $receiptHtml = "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <title>Receipt - Order #{$orderId}</title>
+    </head>
+    <body style='margin:0;padding:0;background:#141414;font-family:sans-serif;'>
+        <div style='max-width:520px;margin:auto;background:#141414;border-radius:12px;overflow:hidden;'>
+            <div style='background:#ff7315;padding:24px;text-align:center;'>
+                <h1 style='color:white;margin:0;font-size:1.5rem;'>ProTech Receipt</h1>
+                <p style='color:white;margin:8px 0 0;font-size:0.9rem;'>Order #{$orderId}</p>
+            </div>
+            <div style='padding:24px;color:#e0e0e0;'>
+                <table style='width:100%;border-collapse:collapse;margin-bottom:20px;'>
+                    <tr>
+                        <td style='padding:8px 0;color:#888;font-size:0.85rem;'>Date</td>
+                        <td style='padding:8px 0;text-align:right;'>{$orderDate}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:8px 0;color:#888;font-size:0.85rem;'>Time</td>
+                        <td style='padding:8px 0;text-align:right;'>{$orderTime}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:8px 0;color:#888;font-size:0.85rem;'>Status</td>
+                        <td style='padding:8px 0;text-align:right;text-transform:capitalize;'>{$order['status']}</td>
+                    </tr>
+                </table>
+
+                <h3 style='color:#ff7315;font-size:1rem;margin:24px 0 12px;border-bottom:1px solid #2a2a2a;padding-bottom:8px;'>Items</h3>
+                <table style='width:100%;border-collapse:collapse;'>
+                    <tr style='color:#888;font-size:0.8rem;'>
+                        <th style='padding:8px;text-align:left;'>Product</th>
+                        <th style='padding:8px;text-align:center;'>Qty</th>
+                        <th style='padding:8px;text-align:right;'>Price</th>
+                        <th style='padding:8px;text-align:right;'>Total</th>
+                    </tr>
+                    {$itemsHtml}
+                </table>
+
+                <div style='margin-top:20px;text-align:right;'>
+                    <span style='color:#888;'>Total: </span>
+                    <span style='color:#ff7315;font-size:1.25rem;font-weight:bold;'>₱{$totalAmount}</span>
+                </div>
+
+                <p style='margin-top:32px;color:#888;font-size:0.8rem;text-align:center;'>
+                    Thank you for shopping with ProTech!
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+
+    $dompdf = new Dompdf\Dompdf();
+    $dompdf->loadHtml($receiptHtml);
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+
+    $pdfContent = $dompdf->output();
+
+    try {
+        $mail = dashboard_mailer();
+        $mail->addAddress($customerEmail, $customerName);
+        $mail->Subject = 'Your ProTech Receipt - Order #' . $orderId;
+        $mail->Body = "
+            <div style='font-family:sans-serif;max-width:520px;margin:auto;background:#141414;border-radius:12px;overflow:hidden;'>
+                <div style='background:#ff7315;padding:24px;text-align:center;'>
+                    <h1 style='color:white;margin:0;font-size:1.5rem;'>Order Confirmed!</h1>
+                </div>
+                <div style='padding:24px;color:#e0e0e0;'>
+                    <p>Hi <strong>{$customerName}</strong>,</p>
+                    <p>Thank you for your order! Your receipt is attached to this email.</p>
+                    <p style='color:#888;font-size:0.85rem;'>Order Date: {$orderDate}<br>Order Time: {$orderTime}</p>
+                    <p style='margin-top:24px;color:#888;font-size:0.8rem;'>
+                        If you have any questions, feel free to contact us.
+                    </p>
+                </div>
+            </div>
+        ";
+        $mail->AltBody = "Your ProTech order receipt - Order #{$orderId} - Total: ₱{$totalAmount}";
+
+        $tempFile = sys_get_temp_dir() . '/receipt_' . $orderId . '.pdf';
+        file_put_contents($tempFile, $pdfContent);
+        $mail->addAttachment($tempFile, 'receipt_' . $orderId . '.pdf', 'application/pdf');
+        $mail->send();
+
+        if (file_exists($tempFile)) {
+            unlink($tempFile);
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log('Receipt email failed: ' . $e->getMessage());
+        if (file_exists($tempFile)) {
+            unlink($tempFile);
+        }
+        return false;
     }
 }
 
@@ -860,7 +1062,8 @@ function app_upsert_product(array $user, array $data): array
         : (int) $user['userId'];
 
     if ($productId > 0) {
-        if (app_is_seller($user) && !app_seller_owns_product($user, $productId)) {
+        // Superadmins and admins can edit any product, sellers can only edit their own
+        if (app_is_seller($user) && !app_seller_owns_product($user, $productId) && !app_is_admin($user)) {
             return ['success' => false, 'message' => 'You can only edit your own products.'];
         }
 
