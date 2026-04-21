@@ -11,55 +11,71 @@ $flash = null;
 
 // Fetch user addresses
 $addresses = [];
-$result = $conn->query("SELECT * FROM user_addresses WHERE userId = " . (int)$user['userId'] . " ORDER BY is_default DESC, created_at DESC");
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $addresses[] = $row;
+$result = $conn->query("SHOW TABLES LIKE 'user_addresses'");
+if ($result && $result->num_rows > 0) {
+    $addrResult = $conn->query("SELECT * FROM user_addresses WHERE userId = " . (int)$user['userId'] . " ORDER BY is_default DESC, created_at DESC");
+    if ($addrResult) {
+        while ($row = $addrResult->fetch_assoc()) {
+            $addresses[] = $row;
+        }
     }
 }
 
 // Fetch user payment methods
 $paymentMethods = [];
-$result = $conn->query("SELECT * FROM user_payment_methods WHERE userId = " . (int)$user['userId'] . " ORDER BY is_default DESC, created_at DESC");
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $paymentMethods[] = $row;
+$gcashMethods = [];
+$result = $conn->query("SHOW TABLES LIKE 'user_payment_methods'");
+if ($result && $result->num_rows > 0) {
+    $pmResult = $conn->query("SELECT * FROM user_payment_methods WHERE userId = " . (int)$user['userId'] . " ORDER BY is_default DESC, created_at DESC");
+    if ($pmResult) {
+        while ($row = $pmResult->fetch_assoc()) {
+            $paymentMethods[] = $row;
+            if ($row['type'] === 'gcash') {
+                $gcashMethods[] = $row;
+            }
+        }
     }
 }
+
+$hasGCash = !empty($gcashMethods);
 
 // Handle checkout form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $selectedAddressId = (int)($_POST['address_id'] ?? 0);
-    $selectedPaymentId = (int)($_POST['payment_id'] ?? 0);
+    $selectedPaymentType = $_POST['payment_type'] ?? 'cod';
     
-    if ($selectedAddressId <= 0 || $selectedPaymentId <= 0) {
-        $flash = ['type' => 'danger', 'message' => 'Please select a shipping address and payment method.'];
+    // Check if payment is COD or GCash
+    $isCOD = $selectedPaymentType === 'cod';
+    $isGCash = $selectedPaymentType === 'gcash';
+    
+    if ($selectedAddressId <= 0) {
+        $flash = ['type' => 'danger', 'message' => 'Please select a shipping address.'];
+    } elseif ($selectedPaymentType !== 'cod' && $selectedPaymentType !== 'gcash') {
+        $flash = ['type' => 'danger', 'message' => 'Please select a payment method.'];
     } else {
-        // Get address details
-        $addrStmt = $conn->prepare("SELECT * FROM user_addresses WHERE userAddressId = ? AND userId = ? LIMIT 1");
-        $addrStmt->bind_param('ii', $selectedAddressId, $user['userId']);
-        $addrStmt->execute();
-        $address = $addrStmt->get_result()->fetch_assoc();
-        $addrStmt->close();
-        
-        // Get payment method details
-        $payStmt = $conn->prepare("SELECT * FROM user_payment_methods WHERE userPaymentMethodId = ? AND userId = ? LIMIT 1");
-        $payStmt->bind_param('ii', $selectedPaymentId, $user['userId']);
-        $payStmt->execute();
-        $paymentMethod = $payStmt->get_result()->fetch_assoc();
-        $payStmt->close();
-        
-        if ($address && $paymentMethod) {
+        // Find the selected address from the user's addresses
+        $address = null;
+        foreach ($addresses as $addr) {
+            if ((int)$addr['userAddressId'] === $selectedAddressId) {
+                $address = $addr;
+                break;
+            }
+        }
+
+        if (!$address) {
+            $flash = ['type' => 'danger', 'message' => 'Invalid address selected.'];
+        } else {
             // Store checkout details in session
             $_SESSION['checkout_address_id'] = $selectedAddressId;
-            $_SESSION['checkout_payment_id'] = $selectedPaymentId;
-            $_SESSION['checkout_address'] = $address['street'] . ', ' . $address['barangay'] . ', ' . $address['city'] . ', ' . $address['province'];
+            $_SESSION['checkout_payment_id'] = $selectedPaymentType;
+            $_SESSION['checkout_address'] = $address['street'] . ', ' . $address['barangay'] . ', ' . $address['city'] . ', ' . ($address['province'] ?? '');
             $_SESSION['checkout_phone'] = $address['phone'];
-            $_SESSION['checkout_payment_method'] = $paymentMethod['type'];
-            
+            $_SESSION['checkout_payment_method'] = $selectedPaymentType;
+            $_SESSION['checkout_shipping_cost'] = 250;
+
             // Process checkout
             $result = app_checkout((int)$user['userId']);
-            
+
             if ($result['success']) {
                 // Redirect to confirmation
                 header('Location: checkout.php?confirmed=1');
@@ -67,8 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $flash = ['type' => 'danger', 'message' => $result['message'] ?? 'Checkout failed.'];
             }
-        } else {
-            $flash = ['type' => 'danger', 'message' => 'Invalid address or payment method.'];
         }
     }
 }
@@ -91,7 +105,6 @@ if ($showConfirmation && !empty($orderIds)) {
 $conn->close();
 
 $pageTitle = 'Checkout - ProTech';
-$pageCss = ['checkout.css'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -145,7 +158,8 @@ $pageCss = ['checkout.css'];
             <?php endforeach; ?>
             
             <div class="text-center">
-                <a href="product.php" class="action-btn primary">Continue Shopping</a>
+                <a href="receipt.php?order_id=<?= (int)$order['orderId'] ?>" class="action-btn primary" target="_blank">View Receipt</a>
+                <a href="product.php" class="action-btn secondary">Continue Shopping</a>
                 <a href="profile.php?section=orders" class="action-btn secondary">View Orders</a>
             </div>
             
@@ -194,31 +208,23 @@ $pageCss = ['checkout.css'];
                         <div class="checkout-card">
                             <h4><i class="fa-solid fa-credit-card"></i> Payment Method</h4>
                             
-                            <?php if (empty($paymentMethods)): ?>
-                                <p class="text-secondary">No payment methods saved.</p>
-                                <a href="profile.php?section=settings" class="btn btn-sm btn-outline">Add Payment Method</a>
-                            <?php else: ?>
-                                <?php foreach ($paymentMethods as $pm): ?>
-                                    <div class="payment-option">
-                                        <input type="radio" name="payment_id" value="<?= (int) $pm['userPaymentMethodId'] ?>" 
-                                               id="pm_<?= (int) $pm['userPaymentMethodId'] ?>" 
-                                               <?= $pm['is_default'] ? 'checked' : '' ?>>
-                                        <label for="pm_<?= (int) $pm['userPaymentMethodId'] ?>">
-                                            <strong><?= ucfirst($pm['type']) ?></strong>
-                                            <?php if ($pm['is_default']): ?> <span class="badge bg-primary">Default</span><?php endif; ?>
-                                            <p class="mb-0 text-secondary">
-                                                <?php if ($pm['type'] === 'gcash'): ?>
-                                                    GCash: <?= app_sanitize($pm['gcash_name'] ?? '') ?> (<?= app_sanitize($pm['gcash_number'] ?? '') ?>)
-                                                <?php elseif ($pm['type'] === 'bank'): ?>
-                                                    <?= app_sanitize($pm['bank_name'] ?? '') ?>: <?= app_sanitize($pm['account_number'] ?? '') ?>
-                                                <?php else: ?>
-                                                    Cash on Delivery
-                                                <?php endif; ?>
-                                            </p>
-                                        </label>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                            <!-- COD Option -->
+                            <div class="payment-option">
+                                <input type="radio" name="payment_type" value="cod" id="pm_cod" checked>
+                                <label for="pm_cod">
+                                    <strong>Cash on Delivery</strong>
+                                    <p class="mb-0 text-secondary">Pay when you receive your order</p>
+                                </label>
+                            </div>
+                            
+                            <!-- GCash Option -->
+                            <div class="payment-option">
+                                <input type="radio" name="payment_type" value="gcash" id="pm_gcash">
+                                <label for="pm_gcash">
+                                    <strong>GCash</strong>
+                                    <p class="mb-0 text-secondary">Pay using GCash</p>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     
@@ -261,17 +267,52 @@ $pageCss = ['checkout.css'];
 <?php include __DIR__ . '/includes/footer.php'; ?>
 <?php include __DIR__ . '/includes/scripts.php'; ?>
 <script>
+const hasGCash = <?= $hasGCash ? 'true' : 'false' ?>;
 document.querySelector('.checkout-form')?.addEventListener('submit', function(event) {
     const addressSelected = document.querySelector('input[name="address_id"]:checked');
-    const paymentSelected = document.querySelector('input[name="payment_id"]:checked');
+    const paymentSelected = document.querySelector('input[name="payment_type"]:checked');
     
-    if (!addressSelected || !paymentSelected) {
+    if (!addressSelected) {
         event.preventDefault();
         Swal.fire({
             icon: 'warning',
             title: 'Missing Information',
-            text: 'Please select both a shipping address and payment method.',
+            text: 'Please select a shipping address.',
             confirmButtonText: 'OK'
+        });
+    } else if (!paymentSelected) {
+        event.preventDefault();
+        Swal.fire({
+            icon: 'warning',
+            title: 'Missing Information',
+            text: 'Please select a payment method.',
+            confirmButtonText: 'OK'
+        });
+    } else if (paymentSelected.value === 'gcash') {
+        event.preventDefault();
+        if (!hasGCash) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'No GCash Account',
+                html: 'You don\'t have a GCash account linked yet.<br><br>Please add your GCash account in your <a href="profile.php?section=settings">profile settings</a> to use GCash payment.',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+        Swal.fire({
+            icon: 'info',
+            title: 'GCash Payment',
+            html: 'To complete your GCash payment:<br><br>1. Open GCash app<br>2. Send payment to our GCash number<br>3. Enter your reference number<br><br>Reference: PROTECH<span id="refNum"></span>',
+            confirmButtonText: 'I have sent the payment',
+            showCancelButton: true,
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Generate random reference
+                const refNum = '<?= time() ?>';
+                document.getElementById('refNum').textContent = refNum;
+                this.submit();
+            }
         });
     }
 });

@@ -206,6 +206,13 @@ function app_ensure_schema(mysqli $conn): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
+    // Add missing columns if they don't exist
+    $conn->query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone VARCHAR(20) DEFAULT NULL");
+    $conn->query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_address TEXT DEFAULT NULL");
+    $conn->query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax DECIMAL(10,2) DEFAULT 0.00");
+    $conn->query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_cost DECIMAL(10,2) DEFAULT 0.00");
+    $conn->query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT 'cod'");
+    
     $conn->query("ALTER TABLE orders MODIFY COLUMN status VARCHAR(30) NOT NULL DEFAULT 'placed'");
 
     // ── order_items ───────────────────────────────────────────────────────────
@@ -721,6 +728,11 @@ function app_checkout(int $userId): array
 
     try {
         $productIds   = array_map(fn ($item) => (int) $item['productId'], $items);
+        
+        if (empty($productIds)) {
+            throw new RuntimeException('Your cart is empty.');
+        }
+        
         $placeholders = implode(',', array_fill(0, count($productIds), '?'));
         $types        = str_repeat('i', count($productIds));
 
@@ -730,6 +742,11 @@ function app_checkout(int $userId): array
             WHERE productId IN ($placeholders)
             FOR UPDATE
         ");
+        
+        if (!$stmt) {
+            throw new RuntimeException('Failed to prepare statement: ' . $conn->error);
+        }
+        
         $stmt->bind_param($types, ...$productIds);
         $stmt->execute();
         $result     = $stmt->get_result();
@@ -771,26 +788,38 @@ function app_checkout(int $userId): array
             $grouped[$sellerKey]['total'] += $lineTotal;
         }
 
-        $orderStmt = $conn->prepare("INSERT INTO orders (userId, total_amount, status, phone, shipping_address, tax, shipping_cost, payment_method) VALUES (?, ?, 'placed', ?, ?, ?, ?, ?)");
+$orderStmt = $conn->prepare("INSERT INTO orders (userId, total_amount, status, phone, shipping_address, tax, shipping_cost, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");        
+        if (!$orderStmt) {
+            throw new RuntimeException('Failed to prepare order statement: ' . $conn->error);
+        }
         
         // Default values for order metadata
         $phone = $_SESSION['checkout_phone'] ?? '';
-        $shippingAddress = $_SESSION['checkout_shipping_address'] ?? '';
-        $tax = $_SESSION['checkout_tax'] ?? 0.00;
-        $shippingCost = $_SESSION['checkout_shipping_cost'] ?? 0.00;
+        $shippingAddress = $_SESSION['checkout_address'] ?? '';
+        $tax = (float)($_SESSION['checkout_tax'] ?? 0);
+        $shippingCost = (float)($_SESSION['checkout_shipping_cost'] ?? 0);
         $paymentMethod = $_SESSION['checkout_payment_method'] ?? 'cod';
+        $status = 'placed';
         
         // Clear session checkout data after use
-        unset($_SESSION['checkout_phone'], $_SESSION['checkout_shipping_address'], $_SESSION['checkout_tax'], $_SESSION['checkout_shipping_cost'], $_SESSION['checkout_payment_method']);
-        $itemStmt             = $conn->prepare("INSERT INTO order_items (orderId, productId, sellerUserId, product_name, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)");
-        $stockStmt            = $conn->prepare("UPDATE products SET stock = stock - ? WHERE productId = ?");
+        unset($_SESSION['checkout_phone'], $_SESSION['checkout_address'], $_SESSION['checkout_tax'], $_SESSION['checkout_shipping_cost'], $_SESSION['checkout_payment_method']);
+        
+        $itemStmt = $conn->prepare("INSERT INTO order_items (orderId, productId, sellerUserId, product_name, quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?)");
+        if (!$itemStmt) {
+            throw new RuntimeException('Failed to prepare item statement: ' . $conn->error);
+        }
+        
+        $stockStmt = $conn->prepare("UPDATE products SET stock = stock - ? WHERE productId = ?");
+        if (!$stockStmt) {
+            throw new RuntimeException('Failed to prepare stock statement: ' . $conn->error);
+        }
 
         $createdOrderIds = [];
         foreach ($grouped as $group) {
             $sellerId = $group['sellerUserId'];
-            $total    = $group['total'];
+            $total    = (float) $group['total'];
 
-            $orderStmt->bind_param('idsdssss', $userId, $total, $phone, $shippingAddress, $tax, $shippingCost, $paymentMethod);
+            $orderStmt->bind_param('idsssdds', $userId, $total, $status, $phone, $shippingAddress, $tax, $shippingCost, $paymentMethod);
             $orderStmt->execute();
             $orderId           = (int) $conn->insert_id;
             $createdOrderIds[] = $orderId;
@@ -834,6 +863,7 @@ function app_get_order_with_items(int $orderId): ?array
     $conn = app_db();
     $stmt = $conn->prepare("
         SELECT o.orderId, o.userId, o.total_amount, o.status, o.created_at,
+               o.phone, o.shipping_address, o.payment_method, o.tax, o.shipping_cost,
                u.first_name, u.last_name, u.email
         FROM orders o
         JOIN users u ON u.userId = o.userId
@@ -1090,4 +1120,10 @@ function app_upsert_product(array $user, array $data): array
     $stmt->close();
 
     return ['success' => true, 'message' => 'Product created successfully.', 'product_id' => $newId];
+}
+
+function app_no_html_redirect(string $target = 'index.php'): void
+{
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=' . $target . '"><script>location.href=' . json_encode($target) . ';</script></head><body></body></html>';
+    exit;
 }

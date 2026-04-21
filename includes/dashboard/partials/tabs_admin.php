@@ -176,6 +176,7 @@
                             <td><span class="pill <?= app_sanitize($order['status']) ?>"><?= app_sanitize(ucfirst($order['status'])) ?></span></td>
                             <td><?= app_sanitize($order['created_at']) ?></td>
                             <td>
+                                <a href="receipt.php?order_id=<?= (int)$order['orderId'] ?>" class="status-btn" target="_blank" title="View Receipt"><i class="fa-solid fa-receipt"></i></a>
                                 <button class="status-btn" type="button" title="Update Status"
                                     data-modal-target="#orderStatusModal"
                                     data-modal-title="Update Order Status"

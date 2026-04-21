@@ -16,10 +16,9 @@ if (!$order) {
     exit('Order not found.');
 }
 
-// Verify user owns this order or is admin/superadmin
+// Verify user owns this order, is admin/superadmin, or is a seller with items in the order
 $user = app_current_user();
 if (!$user) {
-    // Redirect to login if not logged in
     header('Location: login.php');
     exit;
 }
@@ -27,7 +26,18 @@ if (!$user) {
 $isAdmin = app_is_admin($user);
 $isOrderOwner = ($order['userId'] ?? 0) === ($user['userId'] ?? 0);
 
-if (!$isAdmin && !$isOrderOwner) {
+// Check if seller has items in this order
+$isSellerWithItems = false;
+if (app_is_seller($user)) {
+    $sellerId = (int) $user['userId'];
+    $checkStmt = $conn->prepare("SELECT 1 FROM order_items WHERE orderId = ? AND sellerUserId = ? LIMIT 1");
+    $checkStmt->bind_param('ii', $orderId, $sellerId);
+    $checkStmt->execute();
+    $isSellerWithItems = $checkStmt->get_result()->num_rows > 0;
+    $checkStmt->close();
+}
+
+if (!$isAdmin && !$isOrderOwner && !$isSellerWithItems) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -148,6 +158,22 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
             background-color: #5a6268;
         }
         
+        @media print {
+            body {
+                background: white;
+            }
+            .navbar, .footer, .btn-action, .no-print {
+                display: none !important;
+            }
+            .receipt-container {
+                box-shadow: none;
+                margin: 0;
+                padding: 20px;
+                max-width: 100%;
+                background: white;
+            }
+        }
+
         @media (max-width: 768px) {
             .receipt-info {
                 flex-direction: column;
@@ -174,18 +200,12 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
         <div class="info-section">
             <h4>Customer Information</h4>
             <p><strong>Name:</strong> <?= app_sanitize($order['first_name'] . ' ' . $order['last_name']) ?></p>
-            <p><strong>Email:</strong> <?= app_sanitize($order['email']) ?></p>
             <p><strong>Phone:</strong> <?= app_sanitize($order['phone'] ?? 'Not provided') ?></p>
         </div>
         
         <div class="info-section">
             <h4>Order Details</h4>
             <p><strong>Date:</strong> <?= date('F j, Y, g:i A', strtotime($order['created_at'])) ?></p>
-            <p><strong>Status:</strong> 
-                <span class="status-pill status-<?= strtolower($order['status']) ?>">
-                    <?= ucfirst($order['status']) ?>
-                </span>
-            </p>
             <p><strong>Payment Method:</strong> <?= app_sanitize($order['payment_method'] ?? 'Not specified') ?></p>
         </div>
     </div>
@@ -252,6 +272,7 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
     </div>
     
     <div class="text-center mt-4">
+        <button onclick="window.print()" class="btn-action no-print">Print Receipt</button>
         <a href="product.php" class="btn-action">Continue Shopping</a>
         <a href="profile.php?section=orders" class="btn-action btn-secondary">View Order History</a>
         <?php if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/Protech/receipt_' . $orderId . '.pdf')): ?>

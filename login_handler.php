@@ -1,20 +1,15 @@
 <?php
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
-header('Content-Type: application/json');
 ini_set('display_errors', 0);
-error_reporting(E_ALL);
 ini_set('log_errors', 1);
 
 require_once __DIR__ . '/app.php';
-// Confirm app.php calls session_start(). If not, uncomment:
-// if (session_status() === PHP_SESSION_NONE) session_start();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-    exit;
+    app_no_html_redirect();
 }
+header('Content-Type: application/json');
 
 $ip         = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 $identifier = trim($_POST['identifier'] ?? '');

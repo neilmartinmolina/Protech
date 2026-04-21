@@ -168,7 +168,10 @@ $pageCss = ['my_profile.css'];
                                                     <strong class="d-block mt-1">₱<?= number_format((float) $order['total_amount'], 2) ?></strong>
                                                     <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
                                                 </div>
-                                                <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
+                                                <div class="d-flex align-items-center gap-2">
+<a href="receipt.php?order_id=<?= (int)$order['orderId'] ?>" target="_blank" title="View Receipt" style="color:#ff7315;text-decoration:none;font-size:.85rem;"><i class="fa-solid fa-receipt"></i> Receipt</a>
+                                                    <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
+                                                </div>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
@@ -432,7 +435,10 @@ $pageCss = ['my_profile.css'];
                                             <strong class="d-block mt-1">₱<?= number_format((float) $order['total_amount'], 2) ?></strong>
                                             <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
                                         </div>
-                                        <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <a href="receipt.php?order_id=<?= (int)$order['orderId'] ?>" target="_blank" title="View Receipt" style="color:#ff7315;text-decoration:none;font-size:.85rem;"><i class="fa-solid fa-receipt"></i> Receipt</a>
+                                            <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             </div>

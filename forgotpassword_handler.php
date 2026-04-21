@@ -1,5 +1,4 @@
 <?php
-header('Content-Type: application/json');
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
@@ -14,10 +13,9 @@ require_once __DIR__ . '/phpmailer/PHPMailer.php';
 require_once __DIR__ . '/phpmailer/SMTP.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-    exit;
+    app_no_html_redirect();
 }
+header('Content-Type: application/json');
 
 // ── Determine action: 'request' (send link) or 'reset' (set new password) ────
 $action = trim($_POST['action'] ?? 'request');

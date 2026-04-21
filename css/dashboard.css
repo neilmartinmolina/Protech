@@ -83,6 +83,13 @@
 .status-btn {
     background: var(--primary);
     color: #fff;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.status-btn:hover {
+    color: #fff;
 }
 .reject-btn {
     background: transparent;

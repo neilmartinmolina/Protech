@@ -1,6 +1,5 @@
 <?php
 ob_start();
-header('Content-Type: application/json');
 
 set_exception_handler(function(Throwable $e) {
     http_response_code(500);
@@ -26,10 +25,9 @@ require_once __DIR__ . '/phpmailer/PHPMailer.php';
 require_once __DIR__ . '/phpmailer/SMTP.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-    exit;
+    app_no_html_redirect();
 }
+header('Content-Type: application/json');
 
 function create_mailer(): PHPMailer
 {

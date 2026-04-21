@@ -1,13 +1,10 @@
 <?php
-header('Content-Type: application/json');
-
 require_once __DIR__ . '/app.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
-    exit;
+    app_no_html_redirect();
 }
+header('Content-Type: application/json');
 
 $action = $_POST['action'] ?? 'add';
 $productId = (int) ($_POST['product_id'] ?? 0);
