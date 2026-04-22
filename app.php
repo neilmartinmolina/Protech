@@ -1127,3 +1127,161 @@ function app_no_html_redirect(string $target = 'index.php'): void
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=' . $target . '"><script>location.href=' . json_encode($target) . ';</script></head><body></body></html>';
     exit;
 }
+// =============================================================================
+// CSRF & Session Hardening
+// =============================================================================
+
+/**
+ * Generate or retrieve CSRF token for the current session.
+ * Token expires after 1 hour.
+ *
+ * @return string The CSRF token
+ */
+function app_csrf_token(): string
+{
+    if (empty($_SESSION['csrf_token']) ||
+        empty($_SESSION['csrf_token_expires']) ||
+        $_SESSION['csrf_token_expires'] < time()) {
+        $_SESSION['csrf_token']        = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token_expires'] = time() + 3600;
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Output hidden CSRF input field.
+ */
+function app_csrf_field(): string
+{
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(app_csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+}
+
+/**
+ * Verify a CSRF token (POST or X-CSRF-Token header).
+ */
+function app_verify_csrf(?string $token = null): bool
+{
+    if ($token === null) {
+        $token = $_POST['csrf_token'] ?? null;
+    }
+    if ($token === null) {
+        $headers = getallheaders();
+        $token  = $headers['X-CSRF-Token'] ?? $headers['X-Csrf-Token'] ?? null;
+    }
+    $sessionToken = $_SESSION['csrf_token'] ?? null;
+    return $sessionToken !== null && hash_equals($sessionToken, $token);
+}
+
+/**
+ * Require valid CSRF token on POST or exit with JSON error.
+ */
+function app_require_csrf(): void
+{
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !app_verify_csrf()) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Invalid or missing CSRF token. Please refresh the page and try again.'
+        ]);
+        exit;
+    }
+}
+
+// =============================================================================
+// Rate Limiting & Login Security
+// =============================================================================
+
+/**
+ * Check if login allowed from IP.
+ * @return array{allowed:bool, remaining:int, blocked_until:string|null}
+ */
+function app_check_login_allowed(mysqli $conn, string $ip): array
+{
+    $window   = date('Y-m-d H:i:s', time() - 300); // 5 minutes
+    $stmt     = $conn->prepare('SELECT attempted_at FROM login_attempts WHERE ip = ? AND attempted_at > ? ORDER BY attempted_at ASC');
+    $stmt->bind_param('ss', $ip, $window);
+    $stmt->execute();
+    $result   = $stmt->get_result();
+    $attempts = [];
+    while ($row = $result->fetch_assoc()) {
+        $attempts[] = $row['attempted_at'];
+    }
+    $stmt->close();
+
+    $count   = count($attempts);
+    $blocked = $count >= 3;
+    $blockedTs = $blocked ? strtotime($attempts[0]) + 300 : null;
+    $remaining = $blocked ? max(0, ceil(($blockedTs - time()) / 60)) : (3 - $count);
+
+    return [
+        'allowed'      => !$blocked,
+        'attempts'     => $count,
+        'remaining'    => $remaining,
+        'blocked_until'=> $blockedTs ? date('Y-m-d H:i:s', $blockedTs) : null,
+    ];
+}
+
+function app_record_login_attempt(mysqli $conn, string $ip, string $identifier): void
+{
+    $stmt = $conn->prepare('INSERT INTO login_attempts (ip, identifier) VALUES (?, ?)');
+    $stmt->bind_param('ss', $ip, $identifier);
+    $stmt->execute();
+    $stmt->close();
+}
+
+function app_clear_login_attempts(mysqli $conn, string $ip): void
+{
+    $stmt = $conn->prepare('DELETE FROM login_attempts WHERE ip = ?');
+    $stmt->bind_param('s', $ip);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Send failed login notification email.
+ */
+function app_send_failed_login_notification(string $email, string $name, string $ip, string $time): bool
+{
+    require_once __DIR__ . '/vendor/autoload.php';
+    require_once __DIR__ . '/includes/dashboard/mailer.php';
+
+    try {
+        $mail = dashboard_mailer();
+        $mail->addAddress($email, $name);
+$mail->Subject = 'Security Alert - Failed Login Attempt';
+        $mail->Body = <<<HTML
+            <div style='font-family:sans-serif;max-width:520px;margin:auto;background:#141414;border-radius:12px;overflow:hidden;'>
+                <div style='background:#ff7315;padding:24px;text-align:center;'>
+                    <h1 style='color:white;margin:0;font-size:1.5rem;'>Security Alert</h1>
+                </div>
+                <div style='padding:24px;color:#e0e0e0;'>
+                    <p>Hi <strong>{$name}</strong>,</p>
+                    <p>We detected a failed login attempt on your ProTech account.</p>
+                    <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
+                        <tr><td style='padding:8px;color:#888;'>Time</td><td style='padding:8px;text-align:right;'>{$time}</td></tr>
+                        <tr><td style='padding:8px;color:#888;'>IP Address</td><td style='padding:8px;text-align:right;'>{$ip}</td></tr>
+                    </table>
+                    <p style='color:#ff7315;'>If this wasn't you, please reset your password immediately.</p>
+                    <p style='margin-top:24px;color:#888;font-size:0.85rem;'>
+                        If you recognize this activity, you can ignore this message.
+                    </p>
+                </div>
+            </div>
+HTML;
+        $mail->AltBody = "Security alert: Failed login attempt from IP {$ip} at {$time}. If not you, reset your password.";
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log('Failed login notification email failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+// =============================================================================
+// Service Layer
+// =============================================================================
+require_once __DIR__ . '/services/CartService.php';
+require_once __DIR__ . '/services/OrderService.php';
+require_once __DIR__ . '/services/UserService.php';
+// === END_INITIAL_FUNCTIONS ===

@@ -30,6 +30,9 @@ if (!$conn->connect_error) {
 $pageTitle   = 'Reset Password - ProTech';
 $pageCss     = ['auth.css'];
 $pageScripts = ['js/reset_password.js'];
+
+require_once __DIR__ . '/app.php';
+$csrfToken = app_csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,6 +61,7 @@ $pageScripts = ['js/reset_password.js'];
             <?php if ($tokenValid): ?>
             <form id="rpForm" novalidate>
                 <input type="hidden" name="action" value="reset">
+                <input type="hidden" name="csrf_token" value="<?= app_sanitize($csrfToken) ?>">
                 <input type="hidden" name="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
 
                 <div class="mb-1">

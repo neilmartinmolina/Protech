@@ -4,6 +4,7 @@ error_reporting(E_ALL);
 ini_set('log_errors', 1);
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/app.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -15,6 +16,12 @@ require_once __DIR__ . '/phpmailer/SMTP.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     app_no_html_redirect();
 }
+
+if (!app_verify_csrf()) {
+    echo json_encode(['success' => false, 'message' => 'Invalid or missing CSRF token. Please refresh the page and try again.']);
+    exit;
+}
+
 header('Content-Type: application/json');
 
 // ── Determine action: 'request' (send link) or 'reset' (set new password) ────

@@ -13,6 +13,11 @@ function profile_process_post($conn, $user) {
         return $result;
     }
 
+    if (!app_verify_csrf()) {
+        $result['flash'] = ['type' => 'danger', 'message' => 'Invalid or missing CSRF token. Please refresh the page and try again.'];
+        return $result;
+    }
+
     $action = $_POST['action'] ?? '';
     $errors = [];
     $flash = null;
@@ -140,7 +145,9 @@ function profile_process_post($conn, $user) {
         $confirmPassword = $_POST['confirm_password'] ?? '';
 
         if ($currentPassword === '') $errors[] = 'Current password is required.';
-        if (strlen($newPassword) < 6) $errors[] = 'New password must be at least 6 characters.';
+        if (strlen($newPassword) < 6) $errors[] = 'Password must be at least 6 characters.';
+        if (!preg_match('/[A-Z]/', $newPassword)) $errors[] = 'Password must include at least one capital letter.';
+        if (!preg_match('/[0-9]/', $newPassword)) $errors[] = 'Password must include at least one number.';
         if ($newPassword !== $confirmPassword) $errors[] = 'New password and confirmation do not match.';
 
         $stmt = $conn->prepare('SELECT password_hash FROM users WHERE userId = ? LIMIT 1');

@@ -159,8 +159,14 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
         }
         
         @media print {
+            @page {
+                margin: 5mm;
+                size: A4;
+            }
             body {
                 background: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             .navbar, .footer, .btn-action, .no-print {
                 display: none !important;
@@ -168,7 +174,7 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
             .receipt-container {
                 box-shadow: none;
                 margin: 0;
-                padding: 20px;
+                padding: 5px;
                 max-width: 100%;
                 background: white;
             }
@@ -240,28 +246,33 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
                     $grandTotal += (float) $item['unit_price'] * (int) $item['quantity'];
                 endforeach; ?>
             </tbody>
-            <tfoot>
-                <tr class="total-row">
-                    <td colspan="3">Subtotal:</td>
-                    <td>₱<?= number_format($grandTotal, 2) ?></td>
-                </tr>
-                <?php if (!empty($order['tax'])): ?>
-                <tr>
-                    <td colspan="3">Tax:</td>
-                    <td>₱<?= number_format((float) $order['tax'], 2) ?></td>
-                </tr>
-                <?php endif; ?>
-                <?php if (!empty($order['shipping_cost'])): ?>
-                <tr>
-                    <td colspan="3">Shipping:</td>
-                    <td>₱<?= number_format((float) $order['shipping_cost'], 2) ?></td>
-                </tr>
-                <?php endif; ?>
-                <tr class="total-row">
-                    <td colspan="3">Amount Due:</td>
-                    <td>₱<?= number_format((float) $order['total_amount'], 2) ?></td>
-                </tr>
-            </tfoot>
+             <tfoot>
+                 <tr class="total-row">
+                     <td colspan="3">Subtotal:</td>
+                     <td>₱<?= number_format($grandTotal, 2) ?></td>
+                 </tr>
+                 <?php if (!empty($order['tax'])): ?>
+                 <tr>
+                     <td colspan="3">Tax:</td>
+                     <td>₱<?= number_format((float) $order['tax'], 2) ?></td>
+                 </tr>
+                 <?php endif; ?>
+                 <?php if (!empty($order['shipping_cost'])): ?>
+                 <tr>
+                     <td colspan="3">Shipping:</td>
+                     <td>₱<?= number_format((float) $order['shipping_cost'], 2) ?></td>
+                 </tr>
+                 <?php endif; ?>
+                 <?php
+                 $finalTotal = $grandTotal;
+                 if (!empty($order['tax'])) $finalTotal += (float) $order['tax'];
+                 if (!empty($order['shipping_cost'])) $finalTotal += (float) $order['shipping_cost'];
+                 ?>
+                 <tr class="total-row">
+                     <td colspan="3">Total:</td>
+                     <td>₱<?= number_format($finalTotal, 2) ?></td>
+                 </tr>
+             </tfoot>
         </table>
     </div>
     
@@ -272,9 +283,8 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
     </div>
     
     <div class="text-center mt-4">
-        <button onclick="window.print()" class="btn-action no-print">Print Receipt</button>
+        <a href="receipt_print.php?order_id=<?= $orderId ?>" class="btn-action no-print">Print Receipt</a>
         <a href="product.php" class="btn-action">Continue Shopping</a>
-        <a href="profile.php?section=orders" class="btn-action btn-secondary">View Order History</a>
         <?php if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/Protech/receipt_' . $orderId . '.pdf')): ?>
             <a href="download_receipt.php?order_id=<?= $orderId ?>" class="btn-action">Download PDF Receipt</a>
         <?php endif; ?>

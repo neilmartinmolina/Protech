@@ -24,6 +24,10 @@ function dashboard_process_post(mysqli $conn, array $user, string $role): array
         return ['flash' => null, 'user' => $user, 'role' => $role];
     }
 
+    if (!app_verify_csrf()) {
+        return ['flash' => ['type' => 'danger', 'message' => 'Invalid or missing CSRF token. Please refresh the page and try again.'], 'user' => $user, 'role' => $role];
+    }
+
     $action = $_POST['action'] ?? '';
 
     // ── Approve seller application ────────────────────────────────────────────

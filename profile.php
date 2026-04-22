@@ -105,7 +105,8 @@ $pageCss = ['my_profile.css'];
 
                         <div class="form-shell <?= $openEditForm ? 'open' : '' ?>" id="editFormShell">
                             <hr class="my-4" style="border-color:var(--border);">
-                            <form method="post" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post" enctype="multipart/form-data">
                                 <input type="hidden" name="action" value="update_profile">
                                 <div class="row g-3">
                                     <div class="col-12">
@@ -246,7 +247,8 @@ $pageCss = ['my_profile.css'];
                                         </div>
                                         <div class="d-flex gap-2">
                                             <?php if (!$addr['is_default']): ?>
-                                                <form method="post" style="display:inline;">
+                                                <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post" style="display:inline;">
                                                     <input type="hidden" name="action" value="set_default_address">
                                                     <input type="hidden" name="address_id" value="<?= (int) $addr['userAddressId'] ?>">
                                                     <button type="submit" class="ghost-btn" style="font-size:.75rem; padding:.25rem .5rem;">Set Default</button>
@@ -297,7 +299,8 @@ $pageCss = ['my_profile.css'];
                                         </div>
                                         <div class="d-flex gap-2">
                                             <?php if (!$method['is_default']): ?>
-                                                <form method="post" style="display:inline;">
+                                                <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post" style="display:inline;">
                                                     <input type="hidden" name="action" value="set_default_payment">
                                                     <input type="hidden" name="payment_id" value="<?= (int) $method['userPaymentMethodId'] ?>">
                                                     <button type="submit" class="ghost-btn" style="font-size:.75rem; padding:.25rem .5rem;">Set Default</button>
@@ -368,7 +371,8 @@ $pageCss = ['my_profile.css'];
                                             </div>
                                         </div>
                                     </div>
-                                    <form method="post">
+                                    <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post">
                                         <input type="hidden" name="action" value="apply_seller">
                                         <div class="row g-3">
                                             <div class="col-12">
@@ -391,7 +395,8 @@ $pageCss = ['my_profile.css'];
                                         <h3>Start selling on ProTech</h3>
                                         <p>Open your own store, list your products, and reach customers across the platform. Applications are reviewed by our admin team.</p>
                                     </div>
-                                    <form method="post">
+                                    <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post">
                                         <input type="hidden" name="action" value="apply_seller">
                                         <div class="row g-3">
                                             <div class="col-12">
@@ -458,7 +463,8 @@ $pageCss = ['my_profile.css'];
                             Your current email is <strong><?= app_sanitize($user['email']) ?></strong>.
                             You must confirm your password to make this change.
                         </p>
-                        <form method="post" style="max-width:480px;">
+                        <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post" style="max-width:480px;">
                             <input type="hidden" name="action" value="change_email">
                             <div class="mb-3">
                                 <label class="form-label">New email address</label>
@@ -480,7 +486,8 @@ $pageCss = ['my_profile.css'];
                             </div>
                         </div>
                         <p class="text-secondary mb-4" style="font-size:.9rem;">Password changes are handled separately from profile details to keep your account secure.</p>
-                        <form method="post" style="max-width:480px;">
+                        <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post" style="max-width:480px;">
                             <input type="hidden" name="action" value="change_password">
                             <div class="mb-3">
                                 <label class="form-label">Current password</label>
@@ -514,7 +521,8 @@ $pageCss = ['my_profile.css'];
                 <h5 class="modal-title">Add New Address</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post">
                 <div class="modal-body">
                     <input type="hidden" name="action" value="add_address">
                     <div class="mb-3">
@@ -572,7 +580,8 @@ $pageCss = ['my_profile.css'];
                 <h5 class="modal-title">Add Payment Method</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
+<form method="post">
                 <div class="modal-body">
                     <input type="hidden" name="action" value="add_payment">
                     <div class="mb-3">

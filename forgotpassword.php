@@ -4,6 +4,9 @@ require_once __DIR__ . '/config.php';
 $pageTitle   = 'Forgot Password - ProTech';
 $pageCss     = ['auth.css'];
 $pageScripts = ['js/forgot_password.js'];
+
+require_once __DIR__ . '/app.php';
+$csrfToken = app_csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -25,6 +28,7 @@ $pageScripts = ['js/forgot_password.js'];
             <div id="serverMessage"></div>
 
             <form id="fpForm" novalidate>
+                <input type="hidden" name="csrf_token" value="<?= app_sanitize($csrfToken) ?>">
 
                 <div class="mb-4">
                     <label class="form-label" for="email">Email address</label>

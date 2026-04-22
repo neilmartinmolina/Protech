@@ -27,7 +27,19 @@ require_once __DIR__ . '/phpmailer/SMTP.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     app_no_html_redirect();
 }
+
+if (!app_verify_csrf()) {
+    echo json_encode(['success' => false, 'errors' => ['Invalid or missing CSRF token. Please refresh the page and try again.']]);
+    exit;
+}
+
 header('Content-Type: application/json');
+
+$displayName = htmlspecialchars($firstName . ' ' . $lastName, ENT_QUOTES, 'UTF-8');
+$safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+$safeUsername = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+$safeStore = htmlspecialchars($storeName ?? '', ENT_QUOTES, 'UTF-8');
+$signupTime = date('F j, Y g:i A');
 
 function create_mailer(): PHPMailer
 {

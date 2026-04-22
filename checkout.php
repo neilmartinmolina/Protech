@@ -9,7 +9,6 @@ $subtotal = app_cart_total();
 
 $flash = null;
 
-// Fetch user addresses
 $addresses = [];
 $result = $conn->query("SHOW TABLES LIKE 'user_addresses'");
 if ($result && $result->num_rows > 0) {
@@ -21,7 +20,6 @@ if ($result && $result->num_rows > 0) {
     }
 }
 
-// Fetch user payment methods
 $paymentMethods = [];
 $gcashMethods = [];
 $result = $conn->query("SHOW TABLES LIKE 'user_payment_methods'");
@@ -39,55 +37,52 @@ if ($result && $result->num_rows > 0) {
 
 $hasGCash = !empty($gcashMethods);
 
-// Handle checkout form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $selectedAddressId = (int)($_POST['address_id'] ?? 0);
-    $selectedPaymentType = $_POST['payment_type'] ?? 'cod';
-    
-    // Check if payment is COD or GCash
-    $isCOD = $selectedPaymentType === 'cod';
-    $isGCash = $selectedPaymentType === 'gcash';
-    
-    if ($selectedAddressId <= 0) {
-        $flash = ['type' => 'danger', 'message' => 'Please select a shipping address.'];
-    } elseif ($selectedPaymentType !== 'cod' && $selectedPaymentType !== 'gcash') {
-        $flash = ['type' => 'danger', 'message' => 'Please select a payment method.'];
+    if (!app_verify_csrf()) {
+        $flash = ['type' => 'danger', 'message' => 'Invalid or missing CSRF token. Please refresh the page and try again.'];
     } else {
-        // Find the selected address from the user's addresses
-        $address = null;
-        foreach ($addresses as $addr) {
-            if ((int)$addr['userAddressId'] === $selectedAddressId) {
-                $address = $addr;
-                break;
-            }
-        }
-
-        if (!$address) {
-            $flash = ['type' => 'danger', 'message' => 'Invalid address selected.'];
+        $selectedAddressId = (int)($_POST['address_id'] ?? 0);
+        $selectedPaymentType = $_POST['payment_type'] ?? 'cod';
+        
+        $isCOD = $selectedPaymentType === 'cod';
+        $isGCash = $selectedPaymentType === 'gcash';
+        
+        if ($selectedAddressId <= 0) {
+            $flash = ['type' => 'danger', 'message' => 'Please select a shipping address.'];
+        } elseif ($selectedPaymentType !== 'cod' && $selectedPaymentType !== 'gcash') {
+            $flash = ['type' => 'danger', 'message' => 'Please select a payment method.'];
         } else {
-            // Store checkout details in session
-            $_SESSION['checkout_address_id'] = $selectedAddressId;
-            $_SESSION['checkout_payment_id'] = $selectedPaymentType;
-            $_SESSION['checkout_address'] = $address['street'] . ', ' . $address['barangay'] . ', ' . $address['city'] . ', ' . ($address['province'] ?? '');
-            $_SESSION['checkout_phone'] = $address['phone'];
-            $_SESSION['checkout_payment_method'] = $selectedPaymentType;
-            $_SESSION['checkout_shipping_cost'] = 250;
+            $address = null;
+            foreach ($addresses as $addr) {
+                if ((int)$addr['userAddressId'] === $selectedAddressId) {
+                    $address = $addr;
+                    break;
+                }
+            }
 
-            // Process checkout
-            $result = app_checkout((int)$user['userId']);
-
-            if ($result['success']) {
-                // Redirect to confirmation
-                header('Location: checkout.php?confirmed=1');
-                exit;
+            if (!$address) {
+                $flash = ['type' => 'danger', 'message' => 'Invalid address selected.'];
             } else {
-                $flash = ['type' => 'danger', 'message' => $result['message'] ?? 'Checkout failed.'];
+                $_SESSION['checkout_address_id'] = $selectedAddressId;
+                $_SESSION['checkout_payment_id'] = $selectedPaymentType;
+                $_SESSION['checkout_address'] = $address['street'] . ', ' . $address['barangay'] . ', ' . $address['city'] . ', ' . ($address['province'] ?? '');
+                $_SESSION['checkout_phone'] = $address['phone'];
+                $_SESSION['checkout_payment_method'] = $selectedPaymentType;
+                $_SESSION['checkout_shipping_cost'] = 250;
+
+                $result = app_checkout((int)$user['userId']);
+
+                if ($result['success']) {
+                    header('Location: checkout.php?confirmed=1');
+                    exit;
+                } else {
+                    $flash = ['type' => 'danger', 'message' => $result['message'] ?? 'Checkout failed.'];
+                }
             }
         }
     }
 }
 
-// Check if this is a confirmed checkout (show order confirmation)
 $showConfirmation = isset($_GET['confirmed']) && $_GET['confirmed'] == '1';
 $orderIds = $_SESSION['checkout_order_ids'] ?? [];
 unset($_SESSION['checkout_order_ids']);
@@ -121,7 +116,6 @@ $pageTitle = 'Checkout - ProTech';
         <?php endif; ?>
         
         <?php if ($showConfirmation && !empty($orderIds)): ?>
-            <!-- Order Confirmation -->
             <div class="section-label"><i class="fa-solid fa-check-circle"></i> Order Confirmed</div>
             <h1 class="section-title">Thank You for Your Purchase!</h1>
             <p class="section-desc mx-auto mb-4">Your order has been successfully placed.</p>
@@ -164,18 +158,16 @@ $pageTitle = 'Checkout - ProTech';
             </div>
             
         <?php elseif (!$items): ?>
-            <!-- Empty Cart -->
             <h2>Your cart is empty</h2>
             <a href="product.php" class="nav-cta">Browse Products</a>
             
         <?php else: ?>
-            <!-- Checkout Form -->
             <div class="section-label"><i class="fa-solid fa-credit-card"></i> Checkout</div>
             <h1 class="section-title">Complete Your Order</h1>
             
             <form method="post" class="checkout-form">
+                <input type="hidden" name="csrf_token" value="<?= app_csrf_token() ?>">
                 <div class="row g-4">
-                    <!-- Shipping Address -->
                     <div class="col-md-6">
                         <div class="checkout-card">
                             <h4><i class="fa-solid fa-location-dot"></i> Shipping Address</h4>
@@ -203,12 +195,10 @@ $pageTitle = 'Checkout - ProTech';
                         </div>
                     </div>
                     
-                    <!-- Payment Method -->
                     <div class="col-md-6">
                         <div class="checkout-card">
                             <h4><i class="fa-solid fa-credit-card"></i> Payment Method</h4>
                             
-                            <!-- COD Option -->
                             <div class="payment-option">
                                 <input type="radio" name="payment_type" value="cod" id="pm_cod" checked>
                                 <label for="pm_cod">
@@ -217,7 +207,6 @@ $pageTitle = 'Checkout - ProTech';
                                 </label>
                             </div>
                             
-                            <!-- GCash Option -->
                             <div class="payment-option">
                                 <input type="radio" name="payment_type" value="gcash" id="pm_gcash">
                                 <label for="pm_gcash">
@@ -228,7 +217,6 @@ $pageTitle = 'Checkout - ProTech';
                         </div>
                     </div>
                     
-                    <!-- Order Summary -->
                     <div class="col-12">
                         <div class="checkout-card">
                             <h4><i class="fa-solid fa-bag-shopping"></i> Order Summary</h4>
@@ -254,7 +242,6 @@ $pageTitle = 'Checkout - ProTech';
                         </div>
                     </div>
                     
-                    <!-- Place Order Button -->
                     <div class="col-12 text-center">
                         <button type="submit" class="action-btn primary w-50">Place Order</button>
                     </div>
@@ -308,7 +295,6 @@ document.querySelector('.checkout-form')?.addEventListener('submit', function(ev
             cancelButtonText: 'Cancel'
         }).then((result) => {
             if (result.isConfirmed) {
-                // Generate random reference
                 const refNum = '<?= time() ?>';
                 document.getElementById('refNum').textContent = refNum;
                 this.submit();

@@ -4,6 +4,9 @@ require_once __DIR__ . '/config.php';
 $pageTitle   = 'Sign Up - ProTech';
 $pageCss     = ['signup.css'];
 $pageScripts = ['js/signup.js'];
+
+require_once __DIR__ . '/app.php';
+$csrfToken = app_csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -25,6 +28,7 @@ $pageScripts = ['js/signup.js'];
             <div id="serverMessage"></div>
 
             <form id="signupForm" novalidate enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= app_sanitize($csrfToken) ?>">
                 <div class="row">
                     <div class="col-6 mb-3">
                         <label class="form-label" for="firstName">First name</label>
