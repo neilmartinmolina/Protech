@@ -152,7 +152,7 @@ $pageTitle = 'Checkout - ProTech';
             <?php endforeach; ?>
             
             <div class="text-center">
-                <a href="receipt.php?order_id=<?= (int)$order['orderId'] ?>" class="action-btn primary" target="_blank">View Receipt</a>
+                <a href="report.php?order_id=<?= (int)$order['orderId'] ?>" class="action-btn primary" target="_blank">View Report</a>
                 <a href="product.php" class="action-btn secondary">Continue Shopping</a>
                 <a href="profile.php?section=orders" class="action-btn secondary">View Orders</a>
             </div>

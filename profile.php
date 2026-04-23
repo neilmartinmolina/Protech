@@ -441,7 +441,7 @@ $pageCss = ['my_profile.css'];
                                             <div class="text-secondary mt-1" style="font-size:.85rem;"><?= (int) $order['item_count'] ?> item(s)</div>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
-                                            <a href="receipt.php?order_id=<?= (int)$order['orderId'] ?>" target="_blank" title="View Receipt" style="color:#ff7315;text-decoration:none;font-size:.85rem;"><i class="fa-solid fa-receipt"></i> Receipt</a>
+<a href="report.php?order_id=<?= (int)$order['orderId'] ?>" target="_blank" title="View Report" style="color:#ff7315;text-decoration:none;font-size:.85rem;"><i class="fa-solid fa-receipt"></i> Report</a>
                                             <span class="order-status"><?= app_sanitize(ucfirst($order['status'])) ?></span>
                                         </div>
                                     </div>
