@@ -282,7 +282,7 @@ function seller_initials(string $name): string {
 </section>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
-<script>
+<script <?= csp_nonce_attr() ?>>
 window.__MORE_PRODUCT_PAGE__ = <?= json_encode([
     'cartActionUrl' => ($jsBase ? $jsBase . '/' : '') . 'cart_action.php',
     'cartUrl'       => ($jsBase ? $jsBase . '/' : '') . 'cart.php',
@@ -292,7 +292,7 @@ window.__MORE_PRODUCT_PAGE__ = <?= json_encode([
 </script>
 <?php $pageScripts = ['js/moreproduct.js']; ?>
 <?php include __DIR__ . '/includes/scripts.php'; ?>
-<script>
+<script <?= csp_nonce_attr() ?>>
 document.querySelector('#detailCarousel')?.addEventListener('slide.bs.carousel', e => {
     document.querySelectorAll('.detail-thumb').forEach((t, i) => {
         t.classList.toggle('active', i === e.to);

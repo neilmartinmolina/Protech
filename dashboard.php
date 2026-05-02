@@ -1,5 +1,5 @@
 <?php
-
+<!-- Test successfully -->
 declare(strict_types=1);
 
 require_once __DIR__ . '/app.php';
@@ -82,9 +82,31 @@ $dashboardPayload = [
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="js/modal.js"></script>
-<script>
-window.__DASHBOARD__ = <?= json_encode($dashboardPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-</script>
+<script <?= csp_nonce_attr() ?>>
+        // Chart initialization
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Sales',
+                    data: [12, 19, 3, 5, 2, 3],
+                    backgroundColor: 'rgba(255, 115, 21, 0.8)',
+                    borderColor: 'rgba(255, 115, 21, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

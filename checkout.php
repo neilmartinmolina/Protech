@@ -253,7 +253,7 @@ $pageTitle = 'Checkout - ProTech';
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
 <?php include __DIR__ . '/includes/scripts.php'; ?>
-<script>
+<script <?= csp_nonce_attr() ?>>
 const hasGCash = <?= $hasGCash ? 'true' : 'false' ?>;
 document.querySelector('.checkout-form')?.addEventListener('submit', function(event) {
     const addressSelected = document.querySelector('input[name="address_id"]:checked');

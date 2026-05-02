@@ -320,7 +320,7 @@ $jsBase = $jsBase ?: '';
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
 
-<script>
+<script <?= csp_nonce_attr() ?>>
 window.__PRODUCT_PAGE__ = <?= json_encode([
     'cartActionUrl' => ($jsBase ? $jsBase . '/' : '') . 'cart_action.php',
     'cartUrl'         => ($jsBase ? $jsBase . '/' : '') . 'cart.php',

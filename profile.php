@@ -621,7 +621,7 @@ $pageCss = ['my_profile.css'];
 </div>
 
 <?php include __DIR__ . '/includes/scripts.php'; ?>
-<script>
+<script <?= csp_nonce_attr() ?>>
 (() => {
     const editShell = document.getElementById('editFormShell');
     const toggleBtn = document.getElementById('toggleEditBtn');

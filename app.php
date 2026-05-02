@@ -1124,7 +1124,7 @@ function app_upsert_product(array $user, array $data): array
 
 function app_no_html_redirect(string $target = 'index.php'): void
 {
-    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=' . $target . '"><script>location.href=' . json_encode($target) . ';</script></head><body></body></html>';
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=' . $target . '"><script>' . htmlspecialchars('location.href=' . json_encode($target), ENT_QUOTES) . '</script></head><body></body></html>';
     exit;
 }
 // =============================================================================

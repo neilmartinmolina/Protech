@@ -75,7 +75,7 @@ if ($navUser && ($navUser['role'] ?? '') === 'seller') {
     </div>
 </nav>
 
-<script>
+<script <?= csp_nonce_attr() ?>>
 window.addEventListener('scroll', function() {
     const nav = document.getElementById('mainNavbar');
     if (window.scrollY > 50) {

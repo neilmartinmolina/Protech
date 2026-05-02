@@ -90,7 +90,7 @@ $subtotal = app_cart_total();
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
 <?php include __DIR__ . '/includes/scripts.php'; ?>
-<script>
+<script <?= csp_nonce_attr() ?>>
 (() => {
     async function cartAction(action, productId, quantity = 1) {
         const payload = new FormData();

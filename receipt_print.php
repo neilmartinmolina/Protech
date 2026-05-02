@@ -48,8 +48,8 @@ $pageCss = [];
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/includes/header.php'; ?>
-    <style>
+     <?php include __DIR__ . '/includes/header.php'; ?>
+     <style <?= csp_nonce_attr() ?>>
         * {
             box-sizing: border-box;
         }
@@ -81,86 +81,47 @@ $pageCss = [];
         .receipt-info {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px;
-            gap: 10px;
-        }
-        .info-section {
-            flex: 1;
+            gap: 20px;
+            margin: 20px 0;
         }
         .info-section h4 {
             color: #333;
-            margin: 0 0 5px 0;
-            font-size: 13px;
+            margin: 0 0 10px 0;
+            font-size: 1rem;
         }
         .info-section p {
-            margin: 2px 0;
-        }
-        .customer-info, .order-details {
-            background: white;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #eee;
-        }
-        .customer-info h4, .order-details h4 {
-            margin: 0 0 5px 0;
-            font-size: 13px;
-        }
-        .customer-info p {
-            margin: 2px 0;
+            margin: 5px 0;
         }
         .order-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 5px 0;
-            font-size: 11px;
+            margin: 20px 0;
         }
         .order-table th,
         .order-table td {
-            padding: 6px 8px;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
             text-align: left;
-            border-bottom: 1px solid #eee;
         }
         .order-table th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-            color: #555;
-            font-size: 11px;
+            background: #f5f5f5;
         }
-        .total-row {
-            font-weight: bold;
-            background-color: #fff3cd;
+        .totals {
+            text-align: right;
+            margin: 20px 0;
         }
-        .footer-note {
-            text-align: center;
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid #eee;
-            color: #666;
-            font-style: italic;
-            font-size: 11px;
-        }
-        .footer-note p {
-            margin: 2px 0;
+        .totals p {
+            margin: 5px 0;
         }
         @media print {
-            @page {
-                margin: 5mm;
-                size: A4;
-            }
             body {
                 background: white;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
             }
-            .receipt-container {
-                box-shadow: none;
-                margin: 0;
-                padding: 5px;
-                max-width: 100%;
-                background: white;
+            .no-print {
+                display: none !important;
             }
         }
-        @media (max-width: 768px) {
+        @media (max-width: 600px) {
             .receipt-info {
                 flex-direction: column;
                 gap: 5px;
@@ -168,7 +129,8 @@ $pageCss = [];
         }
     </style>
 </head>
-<body onload="window.print()">
+<body>
+    <script <?= csp_nonce_attr() ?> onload="this.closest('body').removeAttribute('onload'); window.print()"></script>
     <div class="receipt-container">
         <div class="receipt-header">
             <h1 class="receipt-title">ProTech Receipt</h1>

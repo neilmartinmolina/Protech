@@ -49,8 +49,8 @@ $pageCss = ['receipt.css']; // We can create a specific receipt style or reuse c
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__ . '/includes/header.php'; ?>
-    <style>
+     <?php include __DIR__ . '/includes/header.php'; ?>
+     <style <?= csp_nonce_attr() ?>>
         /* Receipt-specific styles */
         .receipt-container {
             max-width: 800px;
