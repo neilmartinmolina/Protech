@@ -112,17 +112,17 @@ if ($isLocal) {
 } else {
     Dotenv\Dotenv::createImmutable(dirname(__DIR__, 2))->safeLoad();
 
-    define('DB_HOST',  env_first(['DBHOSTProtech', 'DB_HOST']));
-    define('DB_USER',  env_first(['DBUSERProtech', 'DB_USER']));
-    define('DB_PASS',  env_first(['DBPASSProtech', 'DB_PASS']));
-    define('DB_NAME',  env_first(['DBNAMEProtech', 'DB_NAME']));
-    define('SITE_URL', env_first(['SITEURLProtech', 'SITE_URL']));
-    define('DEV_NAME', env_first(['DEVNAMEProtech', 'DEV_NAME']));
-    define('SMTP_HOST', env_first(['SMTPHOSTProtech', 'SMTP_HOST'], 'smtp.gmail.com'));
-    define('SMTP_PORT', (int) env_first(['SMTPPORTProtech', 'SMTP_PORT'], '587'));
-    define('SMTP_USER', env_first(['SMTPUSERProtech', 'SMTP_USER']));
-    define('SMTP_PASS', env_first(['SMTPPASSProtech', 'SMTPPassProtech', 'SMTP_PASS']));
-    define('ADMIN_EMAIL', env_first(['ADMINEMAILProtech', 'ADMIN_EMAIL']));
-    define('SUPERADMIN_EMAIL', env_first(['SUPERADMINEMAILProtech', 'SUPERADMIN_EMAIL']));
-    define('FROM_NAME', env_first(['FROMNAMEProtech', 'FROM_NAME'], 'Protech'));
+    define('DB_HOST',  env_value('DBHOSTProtech'));
+    define('DB_USER',  env_value('DBUSERProtech'));
+    define('DB_PASS',  env_value('DBPASSProtech'));
+    define('DB_NAME',  env_value('DBNAMEProtech'));
+    define('SITE_URL', env_value('SITEURLProtech'));
+    define('DEV_NAME', env_value('DEVNAMEProtech'));
+    define('SMTP_HOST', env_value('SMTPHOSTProtech'));
+    define('SMTP_PORT', (int) env_value('SMTPPORTProtech'));
+    define('SMTP_USER', env_value('SMTPUSERProtech'));
+    define('SMTP_PASS', env_value('SMTPPASSProtech'));
+    define('ADMIN_EMAIL', env_value('ADMINEMAILProtech'));
+    define('SUPERADMIN_EMAIL', env_value('SUPERADMINEMAILProtech'));
+    define('FROM_NAME', env_value('FROMNAMEProtech'));
 }
