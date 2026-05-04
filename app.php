@@ -8,6 +8,7 @@ function app_db(): mysqli{
         return $conn;
     }
 
+    mysqli_report(MYSQLI_REPORT_OFF);
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
     if ($conn->connect_error) {
@@ -187,6 +188,19 @@ function app_ensure_schema(mysqli $conn): void
     if (!app_column_exists($conn, 'products', 'updated_at')) {
         $conn->query("ALTER TABLE products ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at");
     }
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS product_images (
+            imageId    INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            productId  INT(10) UNSIGNED NOT NULL,
+            image_path VARCHAR(255)     NOT NULL,
+            alt_text   VARCHAR(255)     DEFAULT NULL,
+            sort_order INT              NOT NULL DEFAULT 0,
+            created_at DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_pi_productId (productId),
+            INDEX idx_pi_sort_order (sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
 
     // ── orders ────────────────────────────────────────────────────────────────
     $conn->query("
