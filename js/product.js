@@ -72,6 +72,15 @@
         priceCbs.forEach((cb) => cb.addEventListener('change', applyFilters));
     }
 
+    function initPagination() {
+        document.querySelectorAll('[data-pagination-url]').forEach((link) => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.assign(link.dataset.paginationUrl);
+            });
+        });
+    }
+
     async function updateCart(productId) {
         const payload = new FormData();
         payload.append('action', 'add');
@@ -118,6 +127,7 @@
     function init() {
         initBrandToggle();
         initFilters();
+        initPagination();
         initAddToCart();
     }
 

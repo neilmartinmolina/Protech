@@ -47,7 +47,7 @@ $dashboardPayload = [
         ['selector' => '#sellerProductsTable', 'order' => [[0, 'desc']], 'disabledTargets' => [7], 'placeholder' => 'Search products...'],
         ['selector' => '#adminOrdersTable',    'order' => [[6, 'desc']], 'disabledTargets' => [7], 'placeholder' => 'Search orders...'],
         ['selector' => '#sellerOrdersTable',   'order' => [[5, 'desc']], 'disabledTargets' => [6], 'placeholder' => 'Search orders...'],
-        ['selector' => '#productsTable',       'order' => [[0, 'desc']], 'disabledTargets' => [],   'placeholder' => 'Search all products...'],
+        ['selector' => '#productsTable',       'order' => [[0, 'desc']], 'disabledTargets' => [8],  'placeholder' => 'Search all products...'],
         ['selector' => '#adminUsersTable',     'order' => [[1, 'desc']], 'disabledTargets' => [9], 'placeholder' => 'Search users...'],
     ],
 ];
@@ -86,30 +86,8 @@ $dashboardPayload = [
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="js/modal.js"></script>
 <script <?= csp_nonce_attr() ?>>
-        // Chart initialization
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                datasets: [{
-                    label: 'Sales',
-                    data: [12, 19, 3, 5, 2, 3],
-                    backgroundColor: 'rgba(255, 115, 21, 0.8)',
-                    borderColor: 'rgba(255, 115, 21, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    </script>
+window.__DASHBOARD__ = <?= json_encode($dashboardPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+</script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

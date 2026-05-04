@@ -22,15 +22,37 @@
     const tableDefs = cfg.dataTables || [];
     tableDefs.forEach((def) => {
         if (!def.selector || !document.querySelector(def.selector)) return;
+        if (!window.jQuery || !window.jQuery.fn?.DataTable) return;
         // eslint-disable-next-line no-undef
         window.jQuery(def.selector).DataTable({
+            paging: true,
+            pagingType: 'simple_numbers',
+            lengthChange: true,
             pageLength: 10,
-            lengthMenu: [10, 25, 50],
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
+            searching: true,
+            ordering: true,
+            info: true,
+            autoWidth: false,
+            dom: "<'row align-items-center g-2 mb-3'<'col-sm-6'l><'col-sm-6'f>>" +
+                "<'row'<'col-12'tr>>" +
+                "<'row align-items-center g-2 mt-3'<'col-sm-6'i><'col-sm-6'p>>",
             order: def.order || [],
             columnDefs: def.disabledTargets?.length
                 ? [{ orderable: false, targets: def.disabledTargets }]
                 : [],
-            language: { search: '', searchPlaceholder: def.placeholder || 'Search...' },
+            language: {
+                lengthMenu: 'Show _MENU_ rows',
+                search: '',
+                searchPlaceholder: def.placeholder || 'Search...',
+                info: 'Showing _START_ to _END_ of _TOTAL_ rows',
+                infoEmpty: 'Showing 0 rows',
+                infoFiltered: '(filtered from _MAX_ total rows)',
+                paginate: {
+                    previous: 'Previous',
+                    next: 'Next',
+                },
+            },
         });
     });
 

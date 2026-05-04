@@ -250,6 +250,75 @@ function app_ensure_schema(mysqli $conn): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
+    // Seed sample users up to 50 total accounts for dashboard/testing data.
+    $userCountResult = $conn->query("SELECT COUNT(*) AS total FROM users");
+    $userCountRow    = $userCountResult ? $userCountResult->fetch_assoc() : ['total' => 0];
+    $currentUserCount = (int) ($userCountRow['total'] ?? 0);
+
+    if ($currentUserCount < 50) {
+        $firstNames = [
+            'Alden', 'Bianca', 'Carlo', 'Daphne', 'Enzo', 'Faye', 'Gian', 'Hanna', 'Ivan', 'Jessa',
+            'Kian', 'Lara', 'Marco', 'Nina', 'Owen', 'Paula', 'Quinn', 'Rhea', 'Sandro', 'Talia',
+            'Uriel', 'Vera', 'Warren', 'Xandra', 'Yuri', 'Zia', 'Mika', 'Rafael', 'Sofia', 'Tristan',
+            'Alexa', 'Bryce', 'Clara', 'Derek', 'Elise', 'Franco', 'Gwen', 'Harvey', 'Iris', 'Jonas',
+            'Kara', 'Luis', 'Mara', 'Nico', 'Olivia', 'Pablo', 'Queen', 'Ramon', 'Selene', 'Theo',
+        ];
+        $lastNames = [
+            'Santos', 'Reyes', 'Cruz', 'Bautista', 'Garcia', 'Mendoza', 'Torres', 'Flores', 'Ramos', 'Aquino',
+            'Castillo', 'Rivera', 'Dela Cruz', 'Villanueva', 'Navarro', 'Morales', 'Domingo', 'Valdez', 'Gonzales', 'Mercado',
+            'Salazar', 'Gutierrez', 'Pascual', 'Aguilar', 'Fernandez', 'Lim', 'Tan', 'Co', 'Sy', 'Chua',
+            'Luna', 'Padilla', 'Rosario', 'Marquez', 'Velasco', 'Soriano', 'Ocampo', 'Panganiban', 'Sarmiento', 'Delos Santos',
+            'Cabrera', 'Montemayor', 'Macapagal', 'Abad', 'Bernardo', 'Manalo', 'Escobar', 'Tuazon', 'Lazaro', 'Jacinto',
+        ];
+        $roles = [
+            'customer', 'customer', 'customer', 'seller', 'customer',
+            'customer', 'seller', 'customer', 'customer', 'customer',
+        ];
+        $seedPasswordHash = password_hash('Protech@123', PASSWORD_BCRYPT);
+
+        $checkUserStmt = $conn->prepare("SELECT userId FROM users WHERE email = ? OR username = ? LIMIT 1");
+        $insertUserStmt = $conn->prepare("
+            INSERT INTO users
+                (first_name, last_name, username, email, password_hash, role, seller_status, avatar_path, is_verified, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1, NOW())
+        ");
+        $insertSellerAppStmt = $conn->prepare("
+            INSERT INTO seller_applications (userId, store_name, reason, status, reviewed_at, created_at)
+            VALUES (?, ?, 'Seed seller account for Protech Store testing.', 'approved', NOW(), NOW())
+        ");
+
+        for ($i = 1; $currentUserCount < 50 && $i <= 100; $i++) {
+            $firstName = $firstNames[($i - 1) % count($firstNames)];
+            $lastName  = $lastNames[(($i * 7) - 1) % count($lastNames)];
+            $username  = sprintf('protech_user_%02d', $i);
+            $email     = sprintf('protech.user%02d@example.test', $i);
+            $role      = $roles[($i - 1) % count($roles)];
+            $sellerStatus = $role === 'seller' ? 'approved' : 'not_applicable';
+
+            $checkUserStmt->bind_param('ss', $email, $username);
+            $checkUserStmt->execute();
+            if ($checkUserStmt->get_result()->fetch_assoc()) {
+                continue;
+            }
+
+            $insertUserStmt->bind_param('sssssss', $firstName, $lastName, $username, $email, $seedPasswordHash, $role, $sellerStatus);
+            $insertUserStmt->execute();
+            $newSeedUserId = (int) $conn->insert_id;
+
+            if ($role === 'seller') {
+                $storeName = $firstName . ' ' . $lastName . ' Tech Store';
+                $insertSellerAppStmt->bind_param('is', $newSeedUserId, $storeName);
+                $insertSellerAppStmt->execute();
+            }
+
+            $currentUserCount++;
+        }
+
+        $checkUserStmt->close();
+        $insertUserStmt->close();
+        $insertSellerAppStmt->close();
+    }
+
     // ── user_payment_methods ──────────────────────────────────────────────────
     $conn->query("
         CREATE TABLE IF NOT EXISTS user_payment_methods (
@@ -302,6 +371,10 @@ function app_ensure_schema(mysqli $conn): void
     }
     $saStmt->close();
 
+    if ($superadminId !== null) {
+        $conn->query("UPDATE products SET sellerUserId = {$superadminId} WHERE sellerUserId IS NULL");
+    }
+
     // ── Seed products ─────────────────────────────────────────────────────────
     $seedProducts = [
         ['ProBook X1 Ultra',         'Lenovo',   'Laptops',     '15.6-inch 4K OLED with Intel i9, 32GB RAM, and 1TB SSD.',                  1499.00, 15, 'fa-solid fa-laptop'],
@@ -324,6 +397,36 @@ function app_ensure_schema(mysqli $conn): void
         ['MeshLink AX3000',          'TP-Link',  'Networking',  'Dual-node mesh kit for whole-home wireless coverage.',                      279.00, 17, 'fa-solid fa-network-wired'],
         ['SecureGate Firewall',      'Cisco',    'Networking',  'Small business firewall appliance with VPN and threat filtering.',           599.00,  7, 'fa-solid fa-shield-halved'],
         ['CloudBridge Access Point', 'Ubiquiti', 'Networking',  'Ceiling-mount access point for stable office Wi-Fi.',                       189.00, 26, 'fa-solid fa-tower-broadcast'],
+        ['ThinkPad Edge 15',         'Lenovo',   'Laptops',     'Durable 15-inch business laptop with spill-resistant keyboard.',            1049.00, 19, 'fa-solid fa-laptop'],
+        ['SwiftCore 14 Plus',        'Acer',     'Laptops',     'Portable productivity laptop with 16GB RAM and fast NVMe storage.',          829.00, 33, 'fa-solid fa-laptop'],
+        ['VivoBook Creator 15',      'ASUS',     'Laptops',     'Creator-friendly laptop with OLED display and dedicated graphics.',         1299.00, 14, 'fa-solid fa-laptop'],
+        ['EliteDesk Flex 800',       'HP',       'Desktops',    'Expandable office desktop with quiet cooling and tool-less access.',         929.00, 21, 'fa-solid fa-desktop'],
+        ['OptiCore Micro 7010',      'Dell',     'Desktops',    'Ultra-compact desktop for reception desks and small workspaces.',            679.00, 36, 'fa-solid fa-computer'],
+        ['ROG Vector Tower',         'ASUS',     'Desktops',    'Gaming desktop with liquid cooling and high-refresh graphics support.',     2199.00, 10, 'fa-solid fa-desktop'],
+        ['Prestige Render Mini',     'MSI',      'Desktops',    'Compact creator workstation for editing and rendering.',                    1749.00,  8, 'fa-solid fa-server'],
+        ['Latitude Go 13',           'Dell',     'Laptops',     'Lightweight 13-inch laptop with fingerprint sign-in and USB-C charging.',     999.00, 18, 'fa-solid fa-laptop'],
+        ['Spectra Work 14',          'HP',       'Laptops',     'Business ultrabook with privacy camera shutter and bright display.',         1199.00, 16, 'fa-solid fa-laptop'],
+        ['NitroPulse 17',            'Acer',     'Laptops',     '17-inch gaming laptop with performance cooling and RGB keyboard.',           1399.00, 12, 'fa-solid fa-laptop'],
+        ['MX Keys Pro Combo',        'Logitech', 'Peripherals', 'Premium wireless keyboard and mouse combo for multi-device workflows.',        179.00, 42, 'fa-solid fa-keyboard'],
+        ['DeathAdder Studio Mouse',  'Razer',    'Peripherals', 'Lightweight wired mouse with precise tracking for work and play.',             69.00, 64, 'fa-solid fa-computer-mouse'],
+        ['UltraSharp 32 Dock',       'Dell',     'Peripherals', '32-inch monitor with USB-C hub, slim bezels, and accurate color.',            749.00, 15, 'fa-solid fa-display'],
+        ['BrioStream Webcam',        'Logitech', 'Peripherals', 'Full HD webcam with autofocus for video calls and streaming.',                99.00, 51, 'fa-solid fa-camera'],
+        ['Kraken Lite Headset',      'Razer',    'Peripherals', 'Comfortable headset with clear mic for gaming and meetings.',                 89.00, 47, 'fa-solid fa-headset'],
+        ['PowerPort GaN 100W',       'Anker',    'Peripherals', 'Compact multi-port USB-C charger for laptops, tablets, and phones.',          59.00, 73, 'fa-solid fa-plug'],
+        ['CableFlow USB-C Kit',      'Anker',    'Peripherals', 'Braided USB-C cable bundle with adapters for daily device setups.',            39.00, 88, 'fa-solid fa-plug'],
+        ['Archer Pro AXE5400',       'TP-Link',  'Networking',  'Wi-Fi 6E router for faster home and small office wireless coverage.',         229.00, 24, 'fa-solid fa-wifi'],
+        ['JetStream 16-Port PoE',    'TP-Link',  'Networking',  'Smart PoE switch for cameras, access points, and office devices.',           189.00, 20, 'fa-solid fa-ethernet'],
+        ['Catalyst Lite 8-Port',     'Cisco',    'Networking',  'Compact managed switch with VLAN features for branch offices.',              159.00, 17, 'fa-solid fa-network-wired'],
+        ['UniFi Mesh Beacon',        'Ubiquiti', 'Networking',  'Mesh access point for extending stable wireless coverage.',                  139.00, 29, 'fa-solid fa-tower-broadcast'],
+        ['EdgeRouter Secure X',      'Ubiquiti', 'Networking',  'Security router with VPN support and advanced traffic controls.',            299.00, 11, 'fa-solid fa-shield-halved'],
+        ['ProDesk POS Terminal',     'HP',       'Desktops',    'Retail-ready point-of-sale desktop with compact footprint.',                 849.00, 13, 'fa-solid fa-cash-register'],
+        ['IdeaCentre Home 5',        'Lenovo',   'Desktops',    'Family desktop for browsing, office documents, and school projects.',         699.00, 27, 'fa-solid fa-desktop'],
+        ['CreatorView 27 QHD',       'ASUS',     'Peripherals', '27-inch QHD monitor with ergonomic stand and vivid color output.',            329.00, 25, 'fa-solid fa-display'],
+        ['ProClick Silent Mouse',    'Logitech', 'Peripherals', 'Quiet wireless mouse designed for shared workspaces.',                        49.00, 69, 'fa-solid fa-computer-mouse'],
+        ['Huntsman Mini Board',      'Razer',    'Peripherals', 'Compact optical keyboard with fast actuation and RGB lighting.',             129.00, 34, 'fa-solid fa-keyboard'],
+        ['OmniCharge Dock 12',       'Anker',    'Peripherals', 'Desk dock with HDMI, Ethernet, SD reader, and pass-through charging.',        149.00, 31, 'fa-solid fa-plug'],
+        ['Business Mesh AX1800',     'Cisco',    'Networking',  'Office mesh kit with secure guest network and simple management.',           399.00,  9, 'fa-solid fa-wifi'],
+        ['UniFi Camera Bridge',      'Ubiquiti', 'Networking',  'Network bridge for connecting security cameras and edge devices.',           119.00, 22, 'fa-solid fa-network-wired'],
     ];
 
     $checkStmt  = $conn->prepare("SELECT productId FROM products WHERE name = ? LIMIT 1");
@@ -334,7 +437,21 @@ function app_ensure_schema(mysqli $conn): void
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
+    $protechProductCount = 0;
+    if ($superadminId !== null) {
+        $countStmt = $conn->prepare("SELECT COUNT(*) AS total FROM products WHERE sellerUserId = ?");
+        $countStmt->bind_param('i', $superadminId);
+        $countStmt->execute();
+        $countRow = $countStmt->get_result()->fetch_assoc();
+        $protechProductCount = (int) ($countRow['total'] ?? 0);
+        $countStmt->close();
+    }
+
     foreach ($seedProducts as [$name, $brand, $category, $description, $price, $stock, $iconClass]) {
+        if ($superadminId !== null && $protechProductCount >= 50) {
+            break;
+        }
+
         $checkStmt->bind_param('s', $name);
         $checkStmt->execute();
         if ($checkStmt->get_result()->fetch_assoc()) {
@@ -353,6 +470,9 @@ function app_ensure_schema(mysqli $conn): void
 
         $insertStmt->bind_param('isiisdis', $superadminId, $name, $brandId, $categoryId, $description, $price, $stock, $iconClass);
         $insertStmt->execute();
+        if ($superadminId !== null) {
+            $protechProductCount++;
+        }
     }
 
     // Link existing seed products (NULL sellerUserId) to superadmin store

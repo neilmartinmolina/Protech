@@ -143,6 +143,39 @@ $allBrands = $brandRows ? $brandRows->fetch_all(MYSQLI_ASSOC) : [];
 $jsBase = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/\\');
 $jsBase = ($jsBase === '' || $jsBase === '/' || $jsBase === '\\') ? '' : $jsBase;
 $jsBase = $jsBase ?: '';
+
+function product_page_url(int $page): string
+{
+    $query = array_filter($_GET, static fn ($value): bool => !is_array($value));
+    $query['page'] = max(1, $page);
+
+    return 'product.php?' . http_build_query($query);
+}
+
+function product_pagination_items(int $currentPage, int $totalPages): array
+{
+    $items = [];
+    $lastWasGap = false;
+
+    for ($page = 1; $page <= $totalPages; $page++) {
+        $isVisible = $page === 1
+            || $page === $totalPages
+            || abs($page - $currentPage) <= 1;
+
+        if ($isVisible) {
+            $items[] = $page;
+            $lastWasGap = false;
+            continue;
+        }
+
+        if (!$lastWasGap) {
+            $items[] = null;
+            $lastWasGap = true;
+        }
+    }
+
+    return $items;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -274,40 +307,35 @@ $jsBase = $jsBase ?: '';
                     <nav class="mt-4" aria-label="Product pagination">
                         <ul class="pagination justify-content-center">
                             <?php
-                            $query = $_GET;
                             $currentPageNum = (int) $currentPage;
                             $totalPagesNum  = (int) $totalPages;
                             $prevPage = $currentPageNum - 1;
                             $nextPage = $currentPageNum + 1;
+                            $paginationItems = product_pagination_items($currentPageNum, $totalPagesNum);
                             ?>
                             <li class="page-item <?= $currentPageNum <= 1 ? 'disabled' : '' ?>">
                                 <?php if ($currentPageNum <= 1): ?>
                                     <span class="page-link">Previous</span>
                                 <?php else: ?>
-                                    <?php $query['page'] = $prevPage; ?>
-                                    <a class="page-link" href="product.php?<?= http_build_query($query) ?>">Previous</a>
+                                    <a class="page-link" href="<?= app_sanitize(product_page_url($prevPage)) ?>" data-pagination-url="<?= app_sanitize(product_page_url($prevPage)) ?>">Previous</a>
                                 <?php endif; ?>
                             </li>
 
-                            <?php for ($p = 1; $p <= $totalPagesNum; $p++): ?>
-                                <?php if ($p === 1 || $p === $totalPagesNum || abs($p - $currentPageNum) <= 1): ?>
-                                    <?php $query['page'] = $p; ?>
-                                    <li class="page-item <?= $p === $currentPageNum ? 'active' : '' ?>">
-                                        <a class="page-link" href="product.php?<?= http_build_query($query) ?>"><?= $p ?></a>
+                            <?php foreach ($paginationItems as $p): ?>
+                                <?php if ($p === null): ?>
+                                    <li class="page-item disabled" aria-hidden="true"><span class="page-link">...</span></li>
+                                <?php else: ?>
+                                    <li class="page-item <?= $p === $currentPageNum ? 'active' : '' ?>" <?= $p === $currentPageNum ? 'aria-current="page"' : '' ?>>
+                                        <a class="page-link" href="<?= app_sanitize(product_page_url($p)) ?>" data-pagination-url="<?= app_sanitize(product_page_url($p)) ?>"><?= $p ?></a>
                                     </li>
-                                <?php elseif ($p === 2 && $currentPageNum > 4): ?>
-                                    <li class="page-item disabled"><span class="page-link">…</span></li>
-                                <?php elseif ($p === $totalPagesNum - 1 && $currentPageNum < $totalPagesNum - 3): ?>
-                                    <li class="page-item disabled"><span class="page-link">…</span></li>
                                 <?php endif; ?>
-                            <?php endfor; ?>
+                            <?php endforeach; ?>
 
                             <li class="page-item <?= $currentPageNum >= $totalPagesNum ? 'disabled' : '' ?>">
                                 <?php if ($currentPageNum >= $totalPagesNum): ?>
                                     <span class="page-link">Next</span>
                                 <?php else: ?>
-                                    <?php $query['page'] = $nextPage; ?>
-                                    <a class="page-link" href="product.php?<?= http_build_query($query) ?>">Next</a>
+                                    <a class="page-link" href="<?= app_sanitize(product_page_url($nextPage)) ?>" data-pagination-url="<?= app_sanitize(product_page_url($nextPage)) ?>">Next</a>
                                 <?php endif; ?>
                             </li>
                         </ul>

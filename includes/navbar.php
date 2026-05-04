@@ -3,7 +3,7 @@ require_once dirname(__DIR__) . '/app.php';
 
 $navUser = app_current_user();
 $cartCount = app_cart_count();
-$currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+$activePage = basename($_SERVER['PHP_SELF'] ?? '');
 $dashboardLabel = 'Dashboard';
 $showDashboardLink = false;
 $avatarUrl = app_avatar_url($navUser);
@@ -27,17 +27,17 @@ if ($navUser && ($navUser['role'] ?? '') === 'seller') {
         <div class="collapse navbar-collapse" id="navbarMain">
             <ul class="navbar-nav mx-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                    <a class="nav-link <?= $currentPage === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
+                    <a class="nav-link <?= $activePage === 'index.php' ? 'active' : '' ?>" href="index.php">Home</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="index.php#about">About</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?= $currentPage === 'product.php' ? 'active' : '' ?>" href="product.php">Products</a>
+                    <a class="nav-link <?= $activePage === 'product.php' ? 'active' : '' ?>" href="product.php">Products</a>
                 </li>
                 <?php if ($navUser && $showDashboardLink): ?>
                     <li class="nav-item">
-                        <a class="nav-link <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php"><?= app_sanitize($dashboardLabel) ?></a>
+                        <a class="nav-link <?= $activePage === 'dashboard.php' ? 'active' : '' ?>" href="dashboard.php"><?= app_sanitize($dashboardLabel) ?></a>
                     </li>
                 <?php endif; ?>
             </ul>

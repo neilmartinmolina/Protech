@@ -31,7 +31,7 @@ function csp_nonce_attr(): string {
 $csp = [
     "default-src"    => ["'self'"],
     "script-src"     => ["'self'", "'nonce-{$cspNonce}'", "https://kit.fontawesome.com", "https://cdn.jsdelivr.net", "https://cdn.datatables.net", "https://code.jquery.com"],
-    "style-src"      => ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://code.jquery.com"],
+    "style-src"      => ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdn.datatables.net", "https://code.jquery.com"],
     "img-src"        => ["'self'", "data:", "https:"],
     "font-src"       => ["'self'", "https:", "https://kit.fontawesome.com"],
     "connect-src"    => ["'self'", "https:"],
@@ -69,6 +69,30 @@ header_remove('X-Powered-By');
 
 $isLocal = in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1'], true);
 
+function load_env_file(string $path): void {
+    if (!is_readable($path)) {
+        return;
+    }
+
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+
+        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            continue;
+        }
+
+        [$key, $value] = array_map('trim', explode('=', $line, 2));
+        $value = trim($value, "\"'");
+
+        $_ENV[$key] = $value;
+        putenv($key . '=' . $value);
+    }
+}
+
+function env_value(string $key, string $default = ''): string {
+    return $_ENV[$key] ?? getenv($key) ?: $default;
+}
+
 if ($isLocal) {
     define('DB_HOST',  'localhost');
     define('DB_USER',  'root');
@@ -76,18 +100,23 @@ if ($isLocal) {
     define('DB_NAME',  'protech3nf');
     define('SITE_URL', 'http://localhost/Protech');
 } else {
-    define('DB_HOST',  'localhost');
-    define('DB_USER',  'u845277124_protech');
-    define('DB_PASS',  '562572Bojo');
-    define('DB_NAME',  'u845277124_protech');
-    define('SITE_URL', 'https://protech.argy.host/');
+    load_env_file(dirname(__DIR__, 2) . '/.env');
+
+    define('DBHOSTProtech',  env_value('DBHOSTProtech'));
+    define('DBUSERProtech',  env_value('DBUSERProtech'));
+    define('DBPASSProtech',  env_value('DBPASSProtech'));
+    define('DBNAMEProtech',  env_value('DBNAMEProtech'));
+    define('SITEURLProtech', env_value('SITEURLProtech'));
 }
+
+
+define('SMTPUSERProtech',   env_value('SMTPUSERProtech'));
+define('SMTPPassProtech',   env_value('SMTPPassProtech'));
+
 
 define('DEV_NAME',    'NeilMartin');
 define('SMTP_HOST',   'smtp.gmail.com');
 define('SMTP_PORT',   587);
-define('SMTP_USER',   'neilmartinmolina@gmail.com');
-define('SMTP_PASS',   'yyio jctx phof utie');
 define('ADMIN_EMAIL',    'neilmartinmolina@gmail.com');
 define('SUPERADMIN_EMAIL', 'neilmartinmolina@gmail.com');
 define('FROM_NAME',   'Protech');
