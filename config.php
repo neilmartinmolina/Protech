@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/vendor/autoload.php';
+
 // session cookie params must be set before session_start()
 session_set_cookie_params([
     'lifetime' => 0,
@@ -69,54 +71,58 @@ header_remove('X-Powered-By');
 
 $isLocal = in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1'], true);
 
-function load_env_file(string $path): void {
-    if (!is_readable($path)) {
-        return;
+function env_value(string $key, string $default = ''): string {
+    $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+
+    if ($value === false || $value === null) {
+        return $default;
     }
 
-    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        $line = trim($line);
-
-        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
-            continue;
-        }
-
-        [$key, $value] = array_map('trim', explode('=', $line, 2));
-        $value = trim($value, "\"'");
-
-        $_ENV[$key] = $value;
-        putenv($key . '=' . $value);
-    }
+    return $value;
 }
 
-function env_value(string $key, string $default = ''): string {
-    return $_ENV[$key] ?? getenv($key) ?: $default;
+function env_first(array $keys, string $default = ''): string {
+    foreach ($keys as $key) {
+        $value = env_value($key);
+
+        if ($value !== '') {
+            return $value;
+        }
+    }
+
+    return $default;
 }
 
 if ($isLocal) {
-    define('DB_HOST',  'localhost');
-    define('DB_USER',  'root');
-    define('DB_PASS',  '');
-    define('DB_NAME',  'protech3nf');
-    define('SITE_URL', 'http://localhost/Protech');
+    Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
+
+    define('DB_HOST',  env_first(['DBHOSTProtech', 'DB_HOST'], 'localhost'));
+    define('DB_USER',  env_first(['DBUSERProtech', 'DB_USER'], 'root'));
+    define('DB_PASS',  env_first(['DBPASSProtech', 'DB_PASS']));
+    define('DB_NAME',  env_first(['DBNAMEProtech', 'DB_NAME'], 'protech3nf'));
+    define('SITE_URL', env_first(['SITEURLProtech', 'SITE_URL'], 'http://localhost/Protech'));
+    define('DEV_NAME', env_first(['DEVNAMEProtech', 'DEV_NAME'], 'NeilMartin'));
+    define('SMTP_HOST', env_first(['SMTPHOSTProtech', 'SMTP_HOST'], 'smtp.gmail.com'));
+    define('SMTP_PORT', (int) env_first(['SMTPPORTProtech', 'SMTP_PORT'], '587'));
+    define('SMTP_USER', env_first(['SMTPUSERProtech', 'SMTP_USER']));
+    define('SMTP_PASS', env_first(['SMTPPASSProtech', 'SMTPPassProtech', 'SMTP_PASS']));
+    define('ADMIN_EMAIL', env_first(['ADMINEMAILProtech', 'ADMIN_EMAIL'], 'neilmartinmolina@gmail.com'));
+    define('SUPERADMIN_EMAIL', env_first(['SUPERADMINEMAILProtech', 'SUPERADMIN_EMAIL'], 'neilmartinmolina@gmail.com'));
+    define('FROM_NAME', env_first(['FROMNAMEProtech', 'FROM_NAME'], 'Protech'));
 } else {
-    load_env_file(dirname(__DIR__, 2) . '/.env');
+    Dotenv\Dotenv::createImmutable(dirname(__DIR__, 2))->safeLoad();
 
-    define('DBHOSTProtech',  env_value('DBHOSTProtech'));
-    define('DBUSERProtech',  env_value('DBUSERProtech'));
-    define('DBPASSProtech',  env_value('DBPASSProtech'));
-    define('DBNAMEProtech',  env_value('DBNAMEProtech'));
-    define('SITEURLProtech', env_value('SITEURLProtech'));
+    define('DB_HOST',  env_first(['DBHOSTProtech', 'DB_HOST']));
+    define('DB_USER',  env_first(['DBUSERProtech', 'DB_USER']));
+    define('DB_PASS',  env_first(['DBPASSProtech', 'DB_PASS']));
+    define('DB_NAME',  env_first(['DBNAMEProtech', 'DB_NAME']));
+    define('SITE_URL', env_first(['SITEURLProtech', 'SITE_URL']));
+    define('DEV_NAME', env_first(['DEVNAMEProtech', 'DEV_NAME']));
+    define('SMTP_HOST', env_first(['SMTPHOSTProtech', 'SMTP_HOST'], 'smtp.gmail.com'));
+    define('SMTP_PORT', (int) env_first(['SMTPPORTProtech', 'SMTP_PORT'], '587'));
+    define('SMTP_USER', env_first(['SMTPUSERProtech', 'SMTP_USER']));
+    define('SMTP_PASS', env_first(['SMTPPASSProtech', 'SMTPPassProtech', 'SMTP_PASS']));
+    define('ADMIN_EMAIL', env_first(['ADMINEMAILProtech', 'ADMIN_EMAIL']));
+    define('SUPERADMIN_EMAIL', env_first(['SUPERADMINEMAILProtech', 'SUPERADMIN_EMAIL']));
+    define('FROM_NAME', env_first(['FROMNAMEProtech', 'FROM_NAME'], 'Protech'));
 }
-
-
-define('SMTPUSERProtech',   env_value('SMTPUSERProtech'));
-define('SMTPPassProtech',   env_value('SMTPPassProtech'));
-
-
-define('DEV_NAME',    'NeilMartin');
-define('SMTP_HOST',   'smtp.gmail.com');
-define('SMTP_PORT',   587);
-define('ADMIN_EMAIL',    'neilmartinmolina@gmail.com');
-define('SUPERADMIN_EMAIL', 'neilmartinmolina@gmail.com');
-define('FROM_NAME',   'Protech');
