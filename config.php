@@ -132,33 +132,33 @@ function load_dotenv(string $directory): void {
 if ($isLocal) {
     load_dotenv(__DIR__);
 
-    define('DB_HOST',  env_first(['DBHOSTProtech', 'DB_HOST'], 'localhost'));
-    define('DB_USER',  env_first(['DBUSERProtech', 'DB_USER'], 'root'));
-    define('DB_PASS',  env_first(['DBPASSProtech', 'DB_PASS']));
-    define('DB_NAME',  env_first(['DBNAMEProtech', 'DB_NAME'], 'protech3nf'));
-    define('SITE_URL', env_first(['SITEURLProtech', 'SITE_URL'], 'http://localhost/Protech'));
-    define('DEV_NAME', env_first(['DEVNAMEProtech', 'DEV_NAME'], 'NeilMartin'));
-    define('SMTP_HOST', env_first(['SMTPHOSTProtech', 'SMTP_HOST'], 'smtp.gmail.com'));
-    define('SMTP_PORT', (int) env_first(['SMTPPORTProtech', 'SMTP_PORT'], '587'));
-    define('SMTP_USER', env_first(['SMTPUSERProtech', 'SMTP_USER']));
-    define('SMTP_PASS', env_first(['SMTPPASSProtech', 'SMTPPassProtech', 'SMTP_PASS']));
-    define('ADMIN_EMAIL', env_first(['ADMINEMAILProtech', 'ADMIN_EMAIL'], 'neilmartinmolina@gmail.com'));
-    define('SUPERADMIN_EMAIL', env_first(['SUPERADMINEMAILProtech', 'SUPERADMIN_EMAIL'], 'neilmartinmolina@gmail.com'));
-    define('FROM_NAME', env_first(['FROMNAMEProtech', 'FROM_NAME'], 'Protech'));
+    define('DB_HOST',  'localhost');
+    define('DB_USER',  'root');
+    define('DB_PASS',  env_value('DBPASSProtech'));
+    define('DB_NAME',  'protech3nf');
+    define('SITE_URL', 'http://localhost/Protech');
+    define('DEV_NAME', 'NeilMartin');
+    define('SMTP_HOST', 'smtp.gmail.com');
+    define('SMTP_PORT', 587);
+    define('SMTP_USER', env_value('SMTPUSERProtech'));
+    define('SMTP_PASS', env_value('SMTPPASSProtech'));
+    define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+    define('SUPERADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+    define('FROM_NAME', 'Protech');
 } else {
     load_dotenv(dirname(__DIR__, 2));
 
-    define('DBHOSTProtech',  env_value('DBHOSTProtech'));
-    define('DBUSERProtech',  env_value('DBUSERProtech'));
-    define('DBPASSProtech',  env_value('DBPASSProtech'));
-    define('DBNAMEProtech',  env_value('DBNAMEProtech'));
-    define('SITEURLProtech', env_value('SITEURLProtech'));
-    define('DEVNAMEProtech', env_value('DEVNAMEProtech'));
-    define('SMTPHOSTProtech', env_value('SMTPHOSTProtech'));
-    define('SMTPPORTProtech', (int) env_value('SMTPPORTProtech'));
-    define('SMTPUSERProtech', env_value('SMTPUSERProtech'));
-    define('SMTPPASSProtech', env_value('SMTPPASSProtech'));
-    define('ADMINEMAILProtech', env_value('ADMINEMAILProtech'));
-    define('SUPERADMINEMAILProtech', env_value('SUPERADMINEMAILProtech'));
-    define('FROMNAMEProtech', env_value('FROMNAMEProtech'));
+    define('DB_HOST',  'localhost');
+    define('DB_USER',  'u845277124_protech');
+    define('DB_PASS',  env_value('DBPASSProtech'));
+    define('DB_NAME',  'u845277124_protech');
+    define('SITE_URL', 'https://protech.argy.host/');
+    define('DEV_NAME', 'NeilMartin');
+    define('SMTP_HOST', 'smtp.gmail.com');
+    define('SMTP_PORT', 587);
+    define('SMTP_USER', env_value('SMTPUSERProtech'));
+    define('SMTP_PASS', env_value('SMTPPASSProtech'));
+    define('ADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+    define('SUPERADMIN_EMAIL', 'neilmartinmolina@gmail.com');
+    define('FROM_NAME', 'Protech');
 }
