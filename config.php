@@ -134,7 +134,7 @@ if ($isLocal) {
 
     define('DB_HOST',  'localhost');
     define('DB_USER',  'root');
-    define('DB_PASS',  env_value('DBPASSProtech'));
+    define('DB_PASS',  '');
     define('DB_NAME',  'protech3nf');
     define('SITE_URL', 'http://localhost/Protech');
     define('DEV_NAME', 'NeilMartin');
