@@ -52,6 +52,7 @@ $pageCssExt = [];
                         <h2 class="dev-section-title">About the Developer</h2>
                     </div>
 
+                    
                     <div class="panel-card">
                         <div class="row align-items-center g-4">
 
