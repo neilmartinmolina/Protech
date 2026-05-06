@@ -60,6 +60,43 @@ function app_table_exists(mysqli $conn, string $table): bool
     return $exists;
 }
 
+function app_index_exists(mysqli $conn, string $table, string $index): bool
+{
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = ?
+          AND INDEX_NAME   = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param('ss', $table, $index);
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+
+    return $exists;
+}
+
+function app_foreign_key_exists(mysqli $conn, string $constraint): bool
+{
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND CONSTRAINT_NAME   = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param('s', $constraint);
+    $stmt->execute();
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+
+    return $exists;
+}
+
 function app_ensure_schema(mysqli $conn): void
 {
     static $ready = false;
@@ -89,13 +126,33 @@ function app_ensure_schema(mysqli $conn): void
     $conn->query("
         CREATE TABLE IF NOT EXISTS login_attempts (
             loginAttemptId INT UNSIGNED    AUTO_INCREMENT PRIMARY KEY,
+            userId         INT UNSIGNED    DEFAULT NULL,
             ip             VARCHAR(45)     NOT NULL,
             identifier     VARCHAR(255)    NOT NULL DEFAULT '',
             attempted_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_la_userId        (userId),
             INDEX idx_la_ip_time       (ip, attempted_at),
-            INDEX idx_la_ip_identifier (ip, identifier)
+            INDEX idx_la_ip_identifier (ip, identifier),
+            CONSTRAINT fk_login_attempts_user
+                FOREIGN KEY (userId) REFERENCES users(userId)
+                ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+
+    if (!app_column_exists($conn, 'login_attempts', 'userId')) {
+        $conn->query("ALTER TABLE login_attempts ADD COLUMN userId INT UNSIGNED DEFAULT NULL AFTER loginAttemptId");
+    }
+    if (!app_index_exists($conn, 'login_attempts', 'idx_la_userId')) {
+        $conn->query("ALTER TABLE login_attempts ADD INDEX idx_la_userId (userId)");
+    }
+    if (!app_foreign_key_exists($conn, 'fk_login_attempts_user')) {
+        $conn->query("
+            ALTER TABLE login_attempts
+            ADD CONSTRAINT fk_login_attempts_user
+            FOREIGN KEY (userId) REFERENCES users(userId)
+            ON DELETE SET NULL
+        ");
+    }
 
     // ── remember_tokens ───────────────────────────────────────────────────────
     $conn->query("
@@ -119,9 +176,79 @@ function app_ensure_schema(mysqli $conn): void
             expires_at          DATETIME         NOT NULL,
             used_at             DATETIME         DEFAULT NULL,
             UNIQUE KEY uq_ev_token (token),
-            KEY fk_ev_userId (userId)
+            KEY fk_ev_userId (userId),
+            CONSTRAINT fk_email_verifications_user
+                FOREIGN KEY (userId) REFERENCES users(userId)
+                ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    if (!app_foreign_key_exists($conn, 'fk_email_verifications_user')) {
+        $conn->query("
+            ALTER TABLE email_verifications
+            ADD CONSTRAINT fk_email_verifications_user
+            FOREIGN KEY (userId) REFERENCES users(userId)
+            ON DELETE CASCADE
+        ");
+    }
+    if (
+        app_foreign_key_exists($conn, 'fk_email_verifications_user')
+        && app_foreign_key_exists($conn, 'fk_ev_userId')
+    ) {
+        $conn->query("ALTER TABLE email_verifications DROP FOREIGN KEY fk_ev_userId");
+    }
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS signup_attempts (
+            signupAttemptId INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            userId          INT UNSIGNED DEFAULT NULL,
+            email           VARCHAR(255) NOT NULL DEFAULT '',
+            username        VARCHAR(255) DEFAULT NULL,
+            ip              VARCHAR(45)  NOT NULL,
+            status          ENUM('started','created','failed','verified') NOT NULL DEFAULT 'started',
+            failure_reason  VARCHAR(255) DEFAULT NULL,
+            attempted_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_sa_userId  (userId),
+            INDEX idx_sa_email   (email),
+            INDEX idx_sa_ip_time (ip, attempted_at),
+            CONSTRAINT fk_signup_attempts_user
+                FOREIGN KEY (userId) REFERENCES users(userId)
+                ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    if (!app_column_exists($conn, 'signup_attempts', 'userId')) {
+        $conn->query("ALTER TABLE signup_attempts ADD COLUMN userId INT UNSIGNED DEFAULT NULL AFTER signupAttemptId");
+    }
+    if (!app_column_exists($conn, 'signup_attempts', 'email')) {
+        $conn->query("ALTER TABLE signup_attempts ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT '' AFTER userId");
+    }
+    if (!app_column_exists($conn, 'signup_attempts', 'username')) {
+        $conn->query("ALTER TABLE signup_attempts ADD COLUMN username VARCHAR(255) DEFAULT NULL AFTER email");
+    }
+    if (!app_column_exists($conn, 'signup_attempts', 'status')) {
+        $conn->query("ALTER TABLE signup_attempts ADD COLUMN status ENUM('started','created','failed','verified') NOT NULL DEFAULT 'started' AFTER ip");
+    }
+    if (!app_column_exists($conn, 'signup_attempts', 'failure_reason')) {
+        $conn->query("ALTER TABLE signup_attempts ADD COLUMN failure_reason VARCHAR(255) DEFAULT NULL AFTER status");
+    }
+    if (!app_index_exists($conn, 'signup_attempts', 'idx_sa_userId')) {
+        $conn->query("ALTER TABLE signup_attempts ADD INDEX idx_sa_userId (userId)");
+    }
+    if (!app_index_exists($conn, 'signup_attempts', 'idx_sa_email')) {
+        $conn->query("ALTER TABLE signup_attempts ADD INDEX idx_sa_email (email)");
+    }
+    if (!app_index_exists($conn, 'signup_attempts', 'idx_sa_ip_time')) {
+        $conn->query("ALTER TABLE signup_attempts ADD INDEX idx_sa_ip_time (ip, attempted_at)");
+    }
+    if (!app_foreign_key_exists($conn, 'fk_signup_attempts_user')) {
+        $conn->query("
+            ALTER TABLE signup_attempts
+            ADD CONSTRAINT fk_signup_attempts_user
+            FOREIGN KEY (userId) REFERENCES users(userId)
+            ON DELETE SET NULL
+        ");
+    }
 
     // ── categories ────────────────────────────────────────────────────────────
     $conn->query("
@@ -1356,10 +1483,10 @@ function app_check_login_allowed(mysqli $conn, string $ip): array
     ];
 }
 
-function app_record_login_attempt(mysqli $conn, string $ip, string $identifier): void
+function app_record_login_attempt(mysqli $conn, string $ip, string $identifier, ?int $userId = null): void
 {
-    $stmt = $conn->prepare('INSERT INTO login_attempts (ip, identifier) VALUES (?, ?)');
-    $stmt->bind_param('ss', $ip, $identifier);
+    $stmt = $conn->prepare('INSERT INTO login_attempts (userId, ip, identifier) VALUES (?, ?, ?)');
+    $stmt->bind_param('iss', $userId, $ip, $identifier);
     $stmt->execute();
     $stmt->close();
 }
@@ -1368,6 +1495,25 @@ function app_clear_login_attempts(mysqli $conn, string $ip): void
 {
     $stmt = $conn->prepare('DELETE FROM login_attempts WHERE ip = ?');
     $stmt->bind_param('s', $ip);
+    $stmt->execute();
+    $stmt->close();
+}
+
+function app_record_signup_attempt(
+    mysqli $conn,
+    ?int $userId,
+    string $email,
+    ?string $username,
+    string $ip,
+    string $status,
+    ?string $failureReason = null
+): void {
+    $failureReason = $failureReason !== null ? substr($failureReason, 0, 255) : null;
+    $stmt = $conn->prepare('
+        INSERT INTO signup_attempts (userId, email, username, ip, status, failure_reason)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ');
+    $stmt->bind_param('isssss', $userId, $email, $username, $ip, $status, $failureReason);
     $stmt->execute();
     $stmt->close();
 }

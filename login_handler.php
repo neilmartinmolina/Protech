@@ -105,8 +105,9 @@ $user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 // ── Record attempt BEFORE verifying (prevents timing-based user enumeration) ──
-$stmt = $conn->prepare('INSERT INTO login_attempts (ip, identifier) VALUES (?, ?)');
-$stmt->bind_param('ss', $ip, $identifier);
+$attemptUserId = $user ? (int) $user['userId'] : null;
+$stmt = $conn->prepare('INSERT INTO login_attempts (userId, ip, identifier) VALUES (?, ?, ?)');
+$stmt->bind_param('iss', $attemptUserId, $ip, $identifier);
 $stmt->execute();
 $stmt->close();
 

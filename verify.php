@@ -40,6 +40,17 @@ if (!empty($token)) {
                 $mark->execute();
                 $mark->close();
 
+                $signupAttempt = $conn->prepare("
+                    UPDATE signup_attempts
+                    SET status = 'verified'
+                    WHERE userId = ? AND status = 'created'
+                    ORDER BY attempted_at DESC
+                    LIMIT 1
+                ");
+                $signupAttempt->bind_param('i', $userId);
+                $signupAttempt->execute();
+                $signupAttempt->close();
+
                 $name   = htmlspecialchars($row['first_name']);
                 $status = 'success';
             }

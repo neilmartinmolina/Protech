@@ -35,10 +35,6 @@ if (!app_verify_csrf()) {
 
 header('Content-Type: application/json');
 
-$displayName = htmlspecialchars($firstName . ' ' . $lastName, ENT_QUOTES, 'UTF-8');
-$safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
-$safeUsername = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
-$safeStore = htmlspecialchars($storeName ?? '', ENT_QUOTES, 'UTF-8');
 $signupTime = date('F j, Y g:i A');
 
 function create_mailer(): PHPMailer
@@ -67,6 +63,13 @@ $password     = $_POST['password']             ?? '';
 $confirm      = $_POST['confirmPassword']      ?? '';
 $avatarUpload = $_FILES['avatar']              ?? null;
 $avatarResult = ['success' => true, 'path' => null];
+$ip           = $_SERVER['REMOTE_ADDR']        ?? '0.0.0.0';
+$conn         = app_db();
+
+$displayName  = htmlspecialchars($firstName . ' ' . $lastName, ENT_QUOTES, 'UTF-8');
+$safeEmail    = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+$safeUsername = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
+$safeStore    = htmlspecialchars($storeName, ENT_QUOTES, 'UTF-8');
 
 $errors = [];
 if ($firstName === '')                                        $errors[] = 'First name is required.';
@@ -79,11 +82,10 @@ if (strlen($password) < 6)                                   $errors[] = 'Passwo
 if ($password !== $confirm)                                   $errors[] = 'Passwords do not match.';
 
 if ($errors) {
+    app_record_signup_attempt($conn, null, $email, $username, $ip, 'failed', implode(' ', $errors));
     echo json_encode(['success' => false, 'errors' => $errors]);
     exit;
 }
-
-$conn = app_db();
 
 // ── Check for duplicate email / username ──────────────────────────────────────
 $stmt = $conn->prepare('SELECT userId, email, username FROM users WHERE email = ? OR username = ? LIMIT 1');
@@ -96,6 +98,7 @@ if ($existing) {
     $message = $existing['email'] === $email
         ? 'That email is already registered.'
         : 'That username is already taken.';
+    app_record_signup_attempt($conn, null, $email, $username, $ip, 'failed', $message);
     echo json_encode(['success' => false, 'errors' => [$message]]);
     exit; // ← was missing before — user would fall through to insert
 }
@@ -104,6 +107,7 @@ if ($existing) {
 if ($avatarUpload && ($avatarUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
     $avatarResult = app_store_avatar($avatarUpload);
     if (!$avatarResult['success']) {
+        app_record_signup_attempt($conn, null, $email, $username, $ip, 'failed', $avatarResult['message']);
         echo json_encode(['success' => false, 'errors' => [$avatarResult['message']]]);
         exit;
     }
@@ -159,6 +163,7 @@ try {
     }
 
     $stmt->close();
+    app_record_signup_attempt($conn, $userId, $email, $username, $ip, 'created');
     $conn->commit();
 
     // ── Log registration ──────────────────────────────────────────────────────
@@ -180,6 +185,7 @@ try {
 } catch (Throwable $e) {
     $conn->rollback();
     error_log('Signup transaction failed: ' . $e->getMessage());
+    app_record_signup_attempt($conn, null, $email, $username, $ip, 'failed', 'Could not create account.');
     echo json_encode(['success' => false, 'message' => 'Could not create account. Please try again.']);
     exit;
 }

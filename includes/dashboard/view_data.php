@@ -106,81 +106,91 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
             'revenue'         => 'SELECT COALESCE(SUM(total_amount),0) AS c FROM orders',
         ];
 
-        $result = $conn->query('
-            SELECT sa.sellerApplicationId AS app_id, sa.store_name, sa.reason,
-                   sa.created_at AS applied_at,
-                   u.userId AS user_id, u.first_name, u.last_name, u.email, u.username
-            FROM seller_applications sa
-            JOIN users u ON u.userId = sa.userId
-            WHERE sa.status = \'pending\'
-            ORDER BY sa.created_at ASC
-        ');
-        if ($result !== false) {
-            while ($row = $result->fetch_assoc()) {
-                $pendingApplications[] = $row;
+        if ($tab === 'sellers') {
+            $result = $conn->query('
+                SELECT sa.sellerApplicationId AS app_id, sa.store_name, sa.reason,
+                       sa.created_at AS applied_at,
+                       u.userId AS user_id, u.first_name, u.last_name, u.email, u.username
+                FROM seller_applications sa
+                JOIN users u ON u.userId = sa.userId
+                WHERE sa.status = \'pending\'
+                ORDER BY sa.created_at ASC
+            ');
+            if ($result !== false) {
+                while ($row = $result->fetch_assoc()) {
+                    $pendingApplications[] = $row;
+                }
             }
         }
 
-        $adminOrders = app_get_orders_for_seller(null);
-
-        $result = $conn->query('
-            SELECT p.productId, p.name, p.sellerUserId, p.description, p.icon_class,
-                   b.name AS brand,
-                   c.name AS category,
-                   p.price, p.stock, p.is_active,
-                   COALESCE(
-                       (SELECT sa.store_name
-                        FROM seller_applications sa
-                        WHERE sa.userId = u.userId AND sa.status = \'approved\'
-                        ORDER BY sa.reviewed_at DESC
-                        LIMIT 1),
-                       CASE WHEN u.role = \'superadmin\' THEN \'Protech\' ELSE u.username END,
-                       \'Marketplace\'
-                   ) AS seller_name
-            FROM products p
-            LEFT JOIN brands     b ON b.brandId    = p.brandId
-            LEFT JOIN categories c ON c.categoryId = p.categoryId
-            LEFT JOIN users      u ON u.userId     = p.sellerUserId
-            ORDER BY p.created_at DESC
-        ');
-        $adminProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-
-        if (app_column_exists($conn, 'users', 'created_at')) {
-            $result = $conn->query('
-                SELECT
-                    u.userId, u.first_name, u.last_name, u.username, u.email, u.role, u.seller_status, u.avatar_path, u.created_at,
-                    (SELECT sa.store_name
-                     FROM seller_applications sa
-                     WHERE sa.userId = u.userId AND sa.status = \'approved\'
-                     ORDER BY sa.reviewed_at DESC
-                     LIMIT 1) AS store_name
-                FROM users u
-                ORDER BY u.created_at DESC, u.userId DESC
-            ');
-        } else {
-            $result = $conn->query('
-                SELECT
-                    u.userId, u.first_name, u.last_name, u.username, u.email, u.role, u.seller_status, u.avatar_path,
-                    (SELECT sa.store_name
-                     FROM seller_applications sa
-                     WHERE sa.userId = u.userId AND sa.status = \'approved\'
-                     ORDER BY sa.reviewed_at DESC
-                     LIMIT 1) AS store_name
-                FROM users u
-                ORDER BY u.userId DESC
-            ');
+        if ($tab === 'orders') {
+            $adminOrders = app_get_orders_for_seller(null);
         }
-        $adminUsers = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
-        foreach ($queries as $key => $sql) {
-            $result = $conn->query($sql);
-            if ($result === false) {
-                error_log("Admin stat query failed [{$key}]: " . $conn->error);
-                $adminStats[$key] = 0;
+        if ($tab === 'products') {
+            $result = $conn->query('
+                SELECT p.productId, p.name, p.sellerUserId, p.description, p.icon_class,
+                       b.name AS brand,
+                       c.name AS category,
+                       p.price, p.stock, p.is_active,
+                       COALESCE(
+                           (SELECT sa.store_name
+                            FROM seller_applications sa
+                            WHERE sa.userId = u.userId AND sa.status = \'approved\'
+                            ORDER BY sa.reviewed_at DESC
+                            LIMIT 1),
+                           CASE WHEN u.role = \'superadmin\' THEN \'Protech\' ELSE u.username END,
+                           \'Marketplace\'
+                       ) AS seller_name
+                FROM products p
+                LEFT JOIN brands     b ON b.brandId    = p.brandId
+                LEFT JOIN categories c ON c.categoryId = p.categoryId
+                LEFT JOIN users      u ON u.userId     = p.sellerUserId
+                ORDER BY p.created_at DESC
+            ');
+            $adminProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+        }
+
+        if ($tab === 'users') {
+            if (app_column_exists($conn, 'users', 'created_at')) {
+                $result = $conn->query('
+                    SELECT
+                        u.userId, u.first_name, u.last_name, u.username, u.email, u.role, u.seller_status, u.avatar_path, u.created_at,
+                        (SELECT sa.store_name
+                         FROM seller_applications sa
+                         WHERE sa.userId = u.userId AND sa.status = \'approved\'
+                         ORDER BY sa.reviewed_at DESC
+                         LIMIT 1) AS store_name
+                    FROM users u
+                    ORDER BY u.created_at DESC, u.userId DESC
+                ');
             } else {
-                $adminStats[$key] = $key === 'revenue'
-                    ? (float) ($result->fetch_assoc()['c'] ?? 0)
-                    : (int)   ($result->fetch_assoc()['c'] ?? 0);
+                $result = $conn->query('
+                    SELECT
+                        u.userId, u.first_name, u.last_name, u.username, u.email, u.role, u.seller_status, u.avatar_path,
+                        (SELECT sa.store_name
+                         FROM seller_applications sa
+                         WHERE sa.userId = u.userId AND sa.status = \'approved\'
+                         ORDER BY sa.reviewed_at DESC
+                         LIMIT 1) AS store_name
+                    FROM users u
+                    ORDER BY u.userId DESC
+                ');
+            }
+            $adminUsers = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+        }
+
+        if ($tab === 'dashboard') {
+            foreach ($queries as $key => $sql) {
+                $result = $conn->query($sql);
+                if ($result === false) {
+                    error_log("Admin stat query failed [{$key}]: " . $conn->error);
+                    $adminStats[$key] = 0;
+                } else {
+                    $adminStats[$key] = $key === 'revenue'
+                        ? (float) ($result->fetch_assoc()['c'] ?? 0)
+                        : (int)   ($result->fetch_assoc()['c'] ?? 0);
+                }
             }
         }
     }
@@ -191,50 +201,55 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
     if ($role === 'seller') {
         $sellerId = (int) $user['userId'];
 
-        // Stat counts via prepared statements.
-        $statQueries = [
-            'products'        => 'SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ?',
-            'active_products' => 'SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ? AND is_active = 1',
-            'orders'          => 'SELECT COUNT(DISTINCT o.orderId) AS c FROM orders o JOIN order_items oi ON oi.orderId = o.orderId WHERE oi.sellerUserId = ?',
-            'revenue'         => 'SELECT COALESCE(SUM(oi.quantity * oi.unit_price),0) AS c FROM order_items oi WHERE oi.sellerUserId = ?',
-        ];
+        if ($tab === 'dashboard') {
+            $statQueries = [
+                'products'        => 'SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ?',
+                'active_products' => 'SELECT COUNT(*) AS c FROM products WHERE sellerUserId = ? AND is_active = 1',
+                'orders'          => 'SELECT COUNT(DISTINCT o.orderId) AS c FROM orders o JOIN order_items oi ON oi.orderId = o.orderId WHERE oi.sellerUserId = ?',
+                'revenue'         => 'SELECT COALESCE(SUM(oi.quantity * oi.unit_price),0) AS c FROM order_items oi WHERE oi.sellerUserId = ?',
+            ];
 
-        foreach ($statQueries as $key => $sql) {
-            $stmt = $conn->prepare($sql);
-            if ($stmt === false) {
-                $sellerStats[$key] = 0;
-                continue;
+            foreach ($statQueries as $key => $sql) {
+                $stmt = $conn->prepare($sql);
+                if ($stmt === false) {
+                    $sellerStats[$key] = 0;
+                    continue;
+                }
+                $stmt->bind_param('i', $sellerId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $row    = $result ? $result->fetch_assoc() : null;
+                $sellerStats[$key] = $key === 'revenue'
+                    ? (float) ($row['c'] ?? 0)
+                    : (int)   ($row['c'] ?? 0);
+                $stmt->close();
             }
-            $stmt->bind_param('i', $sellerId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row    = $result ? $result->fetch_assoc() : null;
-            $sellerStats[$key] = $key === 'revenue'
-                ? (float) ($row['c'] ?? 0)
-                : (int)   ($row['c'] ?? 0);
-            $stmt->close();
         }
 
-        $stmt = $conn->prepare('
-            SELECT p.productId, p.name,
-                   b.name AS brand,
-                   c.name AS category,
-                   p.description, p.price, p.stock, p.icon_class, p.is_active
-            FROM products p
-            LEFT JOIN brands     b ON b.brandId    = p.brandId
-            LEFT JOIN categories c ON c.categoryId = p.categoryId
-            WHERE p.sellerUserId = ?
-            ORDER BY p.created_at DESC
-        ');
-        if ($stmt !== false) {
-            $stmt->bind_param('i', $sellerId);
-            $stmt->execute();
-            $result         = $stmt->get_result();
-            $sellerProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-            $stmt->close();
+        if ($tab === 'products') {
+            $stmt = $conn->prepare('
+                SELECT p.productId, p.name,
+                       b.name AS brand,
+                       c.name AS category,
+                       p.description, p.price, p.stock, p.icon_class, p.is_active
+                FROM products p
+                LEFT JOIN brands     b ON b.brandId    = p.brandId
+                LEFT JOIN categories c ON c.categoryId = p.categoryId
+                WHERE p.sellerUserId = ?
+                ORDER BY p.created_at DESC
+            ');
+            if ($stmt !== false) {
+                $stmt->bind_param('i', $sellerId);
+                $stmt->execute();
+                $result         = $stmt->get_result();
+                $sellerProducts = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+                $stmt->close();
+            }
         }
 
-        $sellerOrders = app_get_orders_for_seller($sellerId);
+        if ($tab === 'orders') {
+            $sellerOrders = app_get_orders_for_seller($sellerId);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -251,7 +266,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
         $sellerRevenueByDay[$label] = 0;
     }
 
-    if ($role === 'admin' || $role === 'superadmin') {
+    if (($role === 'admin' || $role === 'superadmin') && $tab === 'dashboard') {
         $chartRows = $conn->query('
             SELECT DATE(created_at) AS order_day, COUNT(*) AS total
             FROM orders
@@ -272,7 +287,7 @@ function dashboard_build_view_data(mysqli $conn, array $user, string $role): arr
         }
     }
 
-    if ($role === 'seller') {
+    if ($role === 'seller' && ($tab === 'dashboard' || $tab === 'analytics')) {
         $sellerId = (int) $user['userId'];
 
         $stmt = $conn->prepare('
