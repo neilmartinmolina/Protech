@@ -20,6 +20,38 @@
         return 'cart.php';
     }
 
+    function getLoginUrl() {
+        if (window.__PRODUCT_PAGE__ && window.__PRODUCT_PAGE__.loginUrl) {
+            return window.__PRODUCT_PAGE__.loginUrl;
+        }
+        return 'login.php?cart_notice=login_to_add_cart';
+    }
+
+    function getCsrfToken() {
+        if (window.__PRODUCT_PAGE__ && window.__PRODUCT_PAGE__.csrfToken) {
+            return window.__PRODUCT_PAGE__.csrfToken;
+        }
+        return '';
+    }
+
+    function isLoggedIn() {
+        return !!(window.__PRODUCT_PAGE__ && Number(window.__PRODUCT_PAGE__.isLoggedIn) === 1);
+    }
+
+    async function promptLogin(message) {
+        if (typeof Swal !== 'undefined') {
+            await Swal.fire({
+                icon: 'info',
+                title: 'Sign in required',
+                text: message || 'login to add to cart',
+                confirmButtonText: 'Go to Login',
+            });
+        } else {
+            alert(message || 'login to add to cart');
+        }
+        window.location.assign(getLoginUrl());
+    }
+
     function initBrandToggle() {
         const toggleBtn = document.getElementById('brandToggleBtn');
         const section = document.getElementById('brandCheckboxSection');
@@ -82,15 +114,25 @@
     }
 
     async function updateCart(productId) {
+        if (!isLoggedIn()) {
+            await promptLogin();
+            return;
+        }
+
         const payload = new FormData();
         payload.append('action', 'add');
         payload.append('product_id', productId);
         payload.append('quantity', '1');
+        payload.append('csrf_token', getCsrfToken());
 
         try {
             const res = await fetch(getCartActionUrl(), { method: 'POST', body: payload });
             const data = await res.json();
             if (!data.success) {
+                if (data.requiresLogin) {
+                    await promptLogin(data.message);
+                    return;
+                }
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
                         icon: 'error',

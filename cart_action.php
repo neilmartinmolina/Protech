@@ -5,12 +5,24 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     app_no_html_redirect();
 }
 
+header('Content-Type: application/json');
+
+if (!app_current_user()) {
+    unset($_SESSION['cart']);
+    http_response_code(401);
+    echo json_encode([
+        'success' => false,
+        'requiresLogin' => true,
+        'message' => 'login to add to cart',
+        'loginUrl' => 'login.php?cart_notice=login_to_add_cart',
+    ]);
+    exit;
+}
+
 if (!app_verify_csrf()) {
     echo json_encode(['success' => false, 'message' => 'Invalid or missing CSRF token. Please refresh the page and try again.']);
     exit;
 }
-
-header('Content-Type: application/json');
 
 $action = $_POST['action'] ?? 'add';
 $productId = (int) ($_POST['product_id'] ?? 0);

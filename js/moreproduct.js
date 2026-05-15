@@ -22,11 +22,18 @@
         if (window.__MORE_PRODUCT_PAGE__ && window.__MORE_PRODUCT_PAGE__.loginUrl) {
             return window.__MORE_PRODUCT_PAGE__.loginUrl;
         }
-        return 'login.php';
+        return 'login.php?cart_notice=login_to_add_cart';
     }
 
     function isLoggedIn() {
         return !!(window.__MORE_PRODUCT_PAGE__ && Number(window.__MORE_PRODUCT_PAGE__.isLoggedIn) === 1);
+    }
+
+    function getCsrfToken() {
+        if (window.__MORE_PRODUCT_PAGE__ && window.__MORE_PRODUCT_PAGE__.csrfToken) {
+            return window.__MORE_PRODUCT_PAGE__.csrfToken;
+        }
+        return '';
     }
 
     function getQuantity() {
@@ -46,6 +53,7 @@
         payload.append('action', 'add');
         payload.append('product_id', String(productId));
         payload.append('quantity', String(quantity));
+        payload.append('csrf_token', getCsrfToken());
 
         var res = await fetch(getCartActionUrl(), { method: 'POST', body: payload });
         return res.json();
@@ -78,16 +86,16 @@
         alert(message);
     }
 
-    async function promptLoginAndRedirect() {
+    async function promptLoginAndRedirect(message) {
         if (typeof Swal !== 'undefined') {
             await Swal.fire({
                 icon: 'info',
-                title: 'Please Login',
-                text: 'Please Login',
+                title: 'Sign in required',
+                text: message || 'login to add to cart',
                 confirmButtonText: 'Go to Login'
             });
         } else {
-            alert('Please Login');
+            alert(message || 'login to add to cart');
         }
         window.location.assign(getLoginUrl());
     }
@@ -112,6 +120,10 @@
                     var quantity = getQuantity();
                     var data = await addToCart(productId, quantity);
                     if (!data.success) {
+                        if (data.requiresLogin) {
+                            await promptLoginAndRedirect(data.message);
+                            return;
+                        }
                         notifyError(data.message || 'Unable to add item to cart.');
                         return;
                     }
@@ -127,12 +139,20 @@
         if (buyBtn) {
             buyBtn.addEventListener('click', async function () {
                 if (lock) return;
+                if (!isLoggedIn()) {
+                    await promptLoginAndRedirect();
+                    return;
+                }
                 lock = true;
                 try {
                     var productId = parseInt(buyBtn.dataset.productId || '0', 10);
                     var quantity = getQuantity();
                     var data = await addToCart(productId, quantity);
                     if (!data.success) {
+                        if (data.requiresLogin) {
+                            await promptLoginAndRedirect();
+                            return;
+                        }
                         notifyError(data.message || 'Unable to process Buy Now.');
                         return;
                     }

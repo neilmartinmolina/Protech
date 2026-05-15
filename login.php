@@ -7,6 +7,15 @@ $pageScripts = ['js/login.js'];
 
 require_once __DIR__ . '/app.php';
 $csrfToken = app_csrf_token();
+$loginFlash = $_SESSION['login_flash'] ?? null;
+unset($_SESSION['login_flash']);
+
+if (($_GET['cart_notice'] ?? '') === 'login_to_add_cart') {
+    $loginFlash = [
+        'type' => 'info',
+        'message' => 'login to add to cart',
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -25,7 +34,13 @@ $csrfToken = app_csrf_token();
         </div>
 
         <div class="login-card">
-            <div id="serverMessage"></div>
+            <div id="serverMessage"
+                 <?php if ($loginFlash): ?>
+                     class="msg-<?= app_sanitize($loginFlash['type'] ?? 'info') ?>"
+                     style="display:block;"
+                 <?php endif; ?>>
+                <?= $loginFlash ? app_sanitize($loginFlash['message']) : '' ?>
+            </div>
 
             <form id="loginForm" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= app_sanitize($csrfToken) ?>">

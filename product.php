@@ -351,7 +351,10 @@ function product_pagination_items(int $currentPage, int $totalPages): array
 <script <?= csp_nonce_attr() ?>>
 window.__PRODUCT_PAGE__ = <?= json_encode([
     'cartActionUrl' => ($jsBase ? $jsBase . '/' : '') . 'cart_action.php',
-    'cartUrl'         => ($jsBase ? $jsBase . '/' : '') . 'cart.php',
+    'cartUrl'       => ($jsBase ? $jsBase . '/' : '') . 'cart.php',
+    'loginUrl'      => ($jsBase ? $jsBase . '/' : '') . 'login.php?cart_notice=login_to_add_cart',
+    'csrfToken'     => app_csrf_token(),
+    'isLoggedIn'    => app_current_user() ? 1 : 0,
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <?php

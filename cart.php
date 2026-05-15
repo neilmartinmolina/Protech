@@ -5,6 +5,16 @@ $pageTitle = 'Cart - ProTech';
 $pageCss  = ['cart.css'];
 $flash    = null;
 
+if (!app_current_user()) {
+    unset($_SESSION['cart']);
+    $_SESSION['login_flash'] = [
+        'type' => 'info',
+        'message' => 'login to add to cart',
+    ];
+    header('Location: login.php?cart_notice=login_to_add_cart');
+    exit;
+}
+
 $items = app_cart_items();
 $subtotal = app_cart_total();
 ?>    
@@ -97,9 +107,20 @@ $subtotal = app_cart_total();
         payload.append('action', action);
         payload.append('product_id', productId);
         payload.append('quantity', quantity);
+        payload.append('csrf_token', <?= json_encode(app_csrf_token()) ?>);
         const res = await fetch('cart_action.php', { method: 'POST', body: payload });
         const data = await res.json();
         if (!data.success) {
+            if (data.requiresLogin) {
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'Sign in required',
+                    text: data.message || 'login to add to cart',
+                    confirmButtonText: 'Go to Login'
+                });
+                window.location.assign(data.loginUrl || 'login.php?cart_notice=login_to_add_cart');
+                return;
+            }
             Swal.fire({
                 icon: 'error',
                 title: 'Cart update failed',
